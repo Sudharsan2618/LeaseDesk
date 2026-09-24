@@ -1,0 +1,55 @@
+{
+  "_note": "B2B personas for deterministic KYC/sanctions/credit mocks (docs/03 §5). Each exercises a branch of the risk/exception logic. Keyed by register_number.",
+  "companies": {
+    "HRB-1001": {
+      "persona": "GREEN_B2B",
+      "legal_name": "Musterlogistik GmbH",
+      "legal_form": "GmbH",
+      "vat_id": "DE100000001",
+      "address": "Hauptstr. 1, 10115 Berlin",
+      "sanctions": { "match": false, "hits": [] },
+      "kyc": { "identity_verified": true, "representative_established": true, "ubo_established": true, "pep_match": false, "kyc_status": "COMPLETE" },
+      "credit": { "credit_index": 88, "default_probability": "0.011", "recommended_limit_eur": "250000", "financial_strength": 82, "company_age_years": 14, "payment_history_score": 90, "negatives": [], "insolvency_flag": false }
+    },
+    "HRB-2002": {
+      "persona": "YELLOW_B2B_NEW_COMPANY",
+      "legal_name": "Frischstart Handels UG",
+      "legal_form": "UG",
+      "vat_id": "DE200000002",
+      "address": "Neubaustr. 9, 20095 Hamburg",
+      "sanctions": { "match": false, "hits": [] },
+      "kyc": { "identity_verified": true, "representative_established": true, "ubo_established": true, "pep_match": false, "kyc_status": "COMPLETE" },
+      "credit": { "credit_index": 62, "default_probability": "0.058", "recommended_limit_eur": "60000", "financial_strength": 55, "company_age_years": 1, "payment_history_score": 60, "negatives": ["thin_file"], "insolvency_flag": false }
+    },
+    "HRB-3003": {
+      "persona": "RED_ECONOMIC_OVEREXPOSED",
+      "legal_name": "Schwerlast Spedition GmbH",
+      "legal_form": "GmbH",
+      "vat_id": "DE300000003",
+      "address": "Industrieweg 3, 45127 Essen",
+      "sanctions": { "match": false, "hits": [] },
+      "kyc": { "identity_verified": true, "representative_established": true, "ubo_established": true, "pep_match": false, "kyc_status": "COMPLETE" },
+      "credit": { "credit_index": 40, "default_probability": "0.17", "recommended_limit_eur": "30000", "financial_strength": 35, "company_age_years": 6, "payment_history_score": 45, "negatives": ["late_payments"], "insolvency_flag": false }
+    },
+    "HRB-4004": {
+      "persona": "RED_COMPLIANCE_SANCTIONS",
+      "legal_name": "Blocked Trading OOO",
+      "legal_form": "GmbH",
+      "vat_id": "DE400000004",
+      "address": "Grenzstr. 4, 04109 Leipzig",
+      "sanctions": { "match": true, "hits": [{ "name": "Blocked Trading OOO", "list": "EU_CONSOLIDATED", "score": 0.98 }] },
+      "kyc": { "identity_verified": true, "representative_established": true, "ubo_established": false, "pep_match": false, "kyc_status": "PENDING" },
+      "credit": { "credit_index": 70, "default_probability": "0.03", "recommended_limit_eur": "120000", "financial_strength": 65, "company_age_years": 9, "payment_history_score": 75, "negatives": [], "insolvency_flag": false }
+    },
+    "HRB-5005": {
+      "persona": "RED_COMPLIANCE_KYC_FAIL",
+      "legal_name": "Opaque Holdings GmbH",
+      "legal_form": "GmbH",
+      "vat_id": "DE500000005",
+      "address": "Verborgen 5, 60311 Frankfurt",
+      "sanctions": { "match": false, "hits": [] },
+      "kyc": { "identity_verified": false, "representative_established": false, "ubo_established": false, "pep_match": false, "kyc_status": "FAILED" },
+      "credit": { "credit_index": 55, "default_probability": "0.06", "recommended_limit_eur": "80000", "financial_strength": 50, "company_age_years": 3, "payment_history_score": 55, "negatives": [], "insolvency_flag": false }
+    }
+  }
+}

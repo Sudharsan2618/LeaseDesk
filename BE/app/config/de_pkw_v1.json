@@ -1,0 +1,107 @@
+{
+  "policy_id": "DE_PKW_V1",
+  "country": "DE",
+  "currency": "EUR",
+  "product": { "vehicle_category": "M1", "lease_type": "KILOMETER_LEASING" },
+
+  "term": { "min_months": 12, "max_months": 60, "step_months": 6, "preferred": [24, 36, 48, 60] },
+
+  "mileage": { "baseline_annual_km": 15000, "min_annual_km": 5000, "max_annual_km": 40000, "step_km": 5000 },
+
+  "special_payment": { "standard_max_pct": 20, "review_max_pct": 30 },
+
+  "quantity": { "min": 1, "max": 50 },
+
+  "services": {
+    "maintenance_eur_month": 39,
+    "tyres_eur_month": 19,
+    "insurance_annual_pct_of_value": 3.5
+  },
+
+  "residual": {
+    "base_price_basis": "LIST_PRICE_NET",
+    "base_term_rv_pct": { "12": 80, "24": 68, "36": 58, "48": 49, "60": 41 },
+    "extra_5000km_penalty_pp": 2.5,
+    "lower_5000km_bonus_pp": 1.5,
+    "mileage_uplift_cap_pp": 5,
+    "mileage_penalty_cap_pp": 15,
+    "minimum_pct": 20,
+    "maximum_pct": 80
+  },
+
+  "funding": {
+    "reference_rate_source": "BUNDESBANK",
+    "reference_rate_series_id": "BBSIS.D.I.ZAR.ZI.EUR.S1311.B.A604._Z.R.A.A._Z._Z.A",
+    "term_spread_pp": { "12-24": 0.35, "25-36": 0.50, "37-48": 0.70, "49-60": 0.90 },
+    "asset_uncertainty_spread_pp": { "HIGH": 0.00, "MEDIUM": 0.30, "LOW": 0.60 }
+  },
+
+  "margin": {
+    "base_pp": 1.50,
+    "risk_adjustment_pp": { "GREEN": 0.25, "YELLOW": 1.00, "RED": null },
+    "deal_size_adjustment_pp": { "lt_20k": 0.25, "20k_60k": 0.00, "60k_100k": -0.10, "gt_100k": "MANUAL_REVIEW" },
+    "commercial_margin_floor_pp": 1.00,
+    "commercial_margin_cap_pp": 3.50
+  },
+
+  "risk": { "green_min": 75, "yellow_min": 55, "red_max": 54.99 },
+
+  "_note_automatic_envelope": "Spec §3.11: scoring is AUTOMATIC when the offer parameters match the predefined automatic process, else MANUAL (manual review). This envelope defines that predefined process for the MVP; any parameter outside it routes the outcome to human review. Controlled reference data — the Agent never decides the pattern.",
+  "scoring_automatic_envelope": {
+    "max_total_exposure_eur": 500000,
+    "max_quantity": 10,
+    "max_acquisition_price_eur": 100000
+  },
+
+  "risk_weights": {
+    "B2B": { "credit_quality": 0.40, "financial_strength": 0.25, "exposure_vs_limit": 0.15, "company_age": 0.10, "payment_history": 0.10 },
+    "B2C": { "credit_bureau": 0.40, "affordability": 0.25, "income_stability": 0.15, "existing_exposure": 0.10, "kyc_confidence": 0.10 }
+  },
+
+  "b2b_exposure_bands": { "strong_max": 50, "moderate_max": 100 },
+  "affordability_bands": { "strong_max": 30, "acceptable_max": 40, "weak_max": 50 },
+
+  "eligibility": {
+    "vehicle": {
+      "category": "M1",
+      "price_min_eur": 10000,
+      "price_max_eur": 150000,
+      "term_max_months": 60,
+      "annual_mileage_max_km": 40000,
+      "age_at_end_max_years": 8
+    },
+    "high_value_review_threshold_eur": 100000
+  },
+
+  "mileage_settlement": {
+    "tolerance_km": 2000,
+    "per_km_rate_eur_by_vehicle_value": { "le_30k": 0.10, "30k_60k": 0.15, "gt_60k": 0.20 }
+  },
+
+  "term_context_caps": {
+    "used_vehicle_max_months": 48,
+    "high_mileage_over_30k_max_months": 48,
+    "low_rv_confidence_max_months": 48
+  },
+
+  "vat": { "source": "EU_TEDB", "fallback_pct": 19 },
+
+  "offer_limit": { "standard_max_eur": 100000, "absolute_mvp_max_eur": 150000 },
+
+  "approval_limits": {
+    "REVIEWER":        { "GREEN": 75000,  "YELLOW": 0 },
+    "APPROVER":        { "GREEN": 100000, "YELLOW": 50000 },
+    "SENIOR_APPROVER": { "GREEN": 150000, "YELLOW": 150000 }
+  },
+
+  "output": { "languages": ["en", "de"], "format": "PDF" },
+
+  "engine_versions": {
+    "lease_calc": "MVP_LEASE_CALC_V1",
+    "funding": "DE_PKW_FUNDING_V1",
+    "margin": "DE_PKW_MARGIN_V1",
+    "residual": "DE_PKW_RV_V1",
+    "risk": "DE_PKW_RISK_V1",
+    "asset_assessment": "DE_ASSET_ASSESS_V1"
+  }
+}

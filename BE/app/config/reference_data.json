@@ -1,0 +1,84 @@
+{
+  "_note": "Controlled Offer Reference Data (spec §3.5, §5.5). The Agent READS this; it never defines or modifies it. Minimal-but-real: PKW is active and fully wired to the DE_PKW_V1 product parameters; Equipment/NFZ/ITK are declared to prove the domain is asset-agnostic but are not yet built (spec §3.6, §9.5 one representative scenario).",
+  "version": "REF_V1",
+  "business_lines": [
+    {
+      "key": "mobility",
+      "name_en": "Mobility & Vehicles",
+      "name_de": "Mobilität & Fahrzeuge",
+      "status": "active",
+      "products": ["pkw_km_leasing"]
+    },
+    {
+      "key": "equipment_finance",
+      "name_en": "Equipment Finance",
+      "name_de": "Objektfinanzierung",
+      "status": "planned",
+      "products": []
+    }
+  ],
+  "leasing_products": [
+    {
+      "key": "pkw_km_leasing",
+      "name_en": "PKW Kilometre Leasing",
+      "name_de": "PKW-Kilometerleasing",
+      "business_line": "mobility",
+      "asset_category": "PKW",
+      "status": "active",
+      "policy_id": "DE_PKW_V1",
+      "description_en": "Full-service kilometre leasing for passenger cars (B2B). Offer parameters, terms, eligibility and calculation inputs come from policy DE_PKW_V1.",
+      "description_de": "Full-Service-Kilometerleasing für Personenkraftwagen (B2B)."
+    }
+  ],
+  "asset_categories": [
+    {
+      "key": "PKW",
+      "name_en": "Passenger car",
+      "name_de": "Personenkraftwagen",
+      "status": "active",
+      "assessment": {"required": true, "mode": "external", "service": "ASSET_ASSESSMENT"},
+      "attribute_schema": [
+        {"key": "make", "label_en": "Make", "label_de": "Marke", "type": "string", "required": true, "filterable": true},
+        {"key": "commercial_name", "label_en": "Model", "label_de": "Modell", "type": "string", "required": true, "filterable": true},
+        {"key": "variant", "label_en": "Variant", "label_de": "Variante", "type": "string", "required": false, "filterable": false},
+        {"key": "fuel_type", "label_en": "Fuel", "label_de": "Kraftstoff", "type": "enum", "required": false, "filterable": true},
+        {"key": "transmission", "label_en": "Transmission", "label_de": "Getriebe", "type": "enum", "required": false, "filterable": true},
+        {"key": "body_type", "label_en": "Body", "label_de": "Karosserie", "type": "enum", "required": false, "filterable": true},
+        {"key": "engine_power_hp", "label_en": "Power (hp)", "label_de": "Leistung (PS)", "type": "int", "required": false, "filterable": true},
+        {"key": "seats", "label_en": "Seats", "label_de": "Sitze", "type": "int", "required": false, "filterable": true},
+        {"key": "co2_class", "label_en": "CO₂ class", "label_de": "CO₂-Klasse", "type": "string", "required": false, "filterable": false},
+        {"key": "colour", "label_en": "Colour", "label_de": "Farbe", "type": "string", "required": false, "filterable": true},
+        {"key": "list_price_net", "label_en": "List price (net)", "label_de": "Listenpreis (netto)", "type": "money", "required": true, "filterable": false}
+      ]
+    },
+    {
+      "key": "Equipment",
+      "name_en": "Equipment",
+      "name_de": "Ausrüstung",
+      "status": "planned",
+      "assessment": {"required": true, "mode": "external", "service": "ASSET_ASSESSMENT"},
+      "attribute_schema": []
+    },
+    {
+      "key": "NFZ",
+      "name_en": "Commercial vehicle",
+      "name_de": "Nutzfahrzeug",
+      "status": "planned",
+      "assessment": {"required": true, "mode": "external", "service": "ASSET_ASSESSMENT"},
+      "attribute_schema": []
+    },
+    {
+      "key": "ITK",
+      "name_en": "IT & Communications",
+      "name_de": "IT & Kommunikation",
+      "status": "planned",
+      "assessment": {"required": true, "mode": "internal", "service": "ASSET_ASSESSMENT"},
+      "attribute_schema": []
+    }
+  ],
+  "channels": [
+    {"key": "internal_sales", "name_en": "Internal Sales", "name_de": "Innendienst", "status": "active", "partner_kind": "business_partner"},
+    {"key": "partner_sales", "name_en": "Partner Sales", "name_de": "Partnervertrieb", "status": "stub", "partner_kind": "offer_partner"},
+    {"key": "credit_partner", "name_en": "Credit Partner", "name_de": "Kreditpartner", "status": "stub", "partner_kind": "offer_partner"}
+  ]
+}

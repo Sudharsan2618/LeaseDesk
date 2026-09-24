@@ -1,0 +1,34 @@
+# Render blueprint — backend (FastAPI). The frontend (FD/) deploys separately on Vercel.
+#
+# Vercel (frontend) settings, for reference:
+#   Root Directory:            FD
+#   Build Command:             next build   (default)
+#   Environment variable:      NEXT_PUBLIC_API_BASE = https://<this-render-service>.onrender.com
+# Then set ALLOWED_ORIGINS below to your Vercel URL(s) so CORS lets the browser through.
+
+services:
+  - type: web
+    name: leasedesk-api
+    runtime: python
+    rootDir: BE
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.api.server:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      # Neon Postgres connection string (Secret — set in the Render dashboard).
+      - key: DATABASE_URL
+        sync: false
+      # Comma-separated list of allowed frontend origins, e.g. https://leasedesk.vercel.app
+      - key: ALLOWED_ORIGINS
+        sync: false
+      # LLM via OpenRouter (optional — without a key the agent uses deterministic fallbacks).
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_MODEL
+        value: openai/gpt-6-luna
+      - key: OPENROUTER_BASE_URL
+        value: https://openrouter.ai/api/v1
