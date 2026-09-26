@@ -27,21 +27,13 @@ from __future__ import annotations
 from langgraph.graph import END, START, StateGraph
 
 from app.graph.agent_nodes import (
+    agent_turn_node,
     assemble_node,
     explain_pricing_node,
     explain_scenarios_node,
-    route_after_asset,
-    route_after_channel,
-    route_after_commercial,
-    route_after_partner,
     route_after_pipeline,
-    route_after_product,
+    route_after_turn,
     route_after_understand,
-    select_asset_node,
-    select_channel_node,
-    select_commercial_node,
-    select_partner_node,
-    select_product_node,
     understand_node,
 )
 from app.graph.nodes import (
@@ -61,11 +53,7 @@ from app.graph.state import OfferState
 def make_builder() -> StateGraph:
     b = StateGraph(OfferState)
     b.add_node("understand", understand_node)
-    b.add_node("select_channel", select_channel_node)       # interrupt: confirm channel
-    b.add_node("select_partner", select_partner_node)       # interrupt: confirm partner (+ dedupe)
-    b.add_node("select_product", select_product_node)       # interrupt: confirm business line + product
-    b.add_node("select_asset", select_asset_node)           # interrupt: confirm asset
-    b.add_node("select_commercial", select_commercial_node)  # interrupt: confirm commercial reqs
+    b.add_node("agent_turn", agent_turn_node)                # interrupt: one conversational intake turn
     b.add_node("assemble", assemble_node)
     b.add_node("run_pipeline", run_pipeline_node)
     b.add_node("explain_pricing", explain_pricing_node)
@@ -76,28 +64,22 @@ def make_builder() -> StateGraph:
     b.add_node("final_validation", final_validation_node)
     b.add_node("generate_offer", generate_offer_node)
 
-    # every step can advance, stay, or JUMP to any other step (goto — edit a confirmed step)
-    _steps = ("select_channel", "select_partner", "select_product", "select_asset", "select_commercial")
-    _select_targets = {n: n for n in _steps} | {"assemble": "assemble"}
-
     b.add_edge(START, "understand")
     b.add_conditional_edges("understand", route_after_understand,
-                            {"run_pipeline": "run_pipeline", "select_channel": "select_channel"})
-    b.add_conditional_edges("select_channel", route_after_channel, dict(_select_targets))
-    b.add_conditional_edges("select_partner", route_after_partner, dict(_select_targets))
-    b.add_conditional_edges("select_product", route_after_product, dict(_select_targets))
-    b.add_conditional_edges("select_asset", route_after_asset, dict(_select_targets))
-    b.add_conditional_edges("select_commercial", route_after_commercial, dict(_select_targets))
+                            {"run_pipeline": "run_pipeline", "agent_turn": "agent_turn"})
+    # one conversational turn: loop until every required field is confirmed, then assemble
+    b.add_conditional_edges("agent_turn", route_after_turn,
+                            {"agent_turn": "agent_turn", "assemble": "assemble"})
     b.add_edge("assemble", "run_pipeline")
     b.add_edge("run_pipeline", "explain_pricing")
     b.add_conditional_edges("explain_pricing", route_after_pipeline,
                             {"scenarios": "scenarios", "final_validation": "final_validation",
-                             "select_asset": "select_asset"})
+                             "agent_turn": "agent_turn"})
     b.add_edge("scenarios", "explain_scenarios")
     b.add_edge("explain_scenarios", "workspace_gate")
     b.add_conditional_edges("workspace_gate", route_after_gate,
                             {"workspace_gate": "workspace_gate", "human_review": "human_review",
-                             **{n: n for n in _steps}})
+                             "agent_turn": "agent_turn"})
     b.add_conditional_edges("human_review", route_after_review,
                             {"final_validation": "final_validation", "workspace_gate": "workspace_gate"})
     b.add_conditional_edges("final_validation", route_after_final,

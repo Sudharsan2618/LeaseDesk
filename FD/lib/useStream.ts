@@ -14,6 +14,8 @@ export function useOfferStream() {
 
   async function run(path: string, body: unknown): Promise<Snapshot | null> {
     setRunning(true);
+    setLines([]);                 // each turn shows only its own activity (no pile-up across turns)
+    idRef.current = 0;
     let snap: Snapshot | null = null;
     try {
       await streamPost(path, body, (e) => {

@@ -8,7 +8,7 @@ import type { FeedLine } from "@/components/LiveFeed";
  *  the agent's proposal was changed), the agent's replies, and the agent's own working log (engine
  *  steps), rendered Claude-Code-style between the messages. One place, one source of truth. */
 export function AgentChat({
-  transcript, lines, running, canSend, onSend, placeholder,
+  transcript, lines, running, canSend, onSend, placeholder, pendingMessage,
 }: {
   transcript: ChatMessage[];
   lines: FeedLine[];
@@ -16,12 +16,13 @@ export function AgentChat({
   canSend: boolean;
   onSend: (message: string) => void;
   placeholder?: string;
+  pendingMessage?: string | null;
 }) {
   const [draft, setDraft] = useState("");
   const logRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
-  }, [transcript, lines, running]);
+  }, [transcript, lines, running, pendingMessage]);
 
   function send() {
     const t = draft.trim();
@@ -48,6 +49,7 @@ export function AgentChat({
               ? <ConfirmEntry key={i} m={m} />
               : <div key={i} className={`bub ${m.role === "user" ? "u" : "a"}`}>{m.content}</div>
           )}
+          {pendingMessage && <div className="bub u">{pendingMessage}</div>}
           {(lines.length > 0 || running) && <AgentLog lines={lines} running={running} />}
         </div>
         <div className="chatin">

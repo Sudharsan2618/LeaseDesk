@@ -9,7 +9,7 @@ import { humanizeException } from "@/lib/negative";
 import { BandPill, OutcomePill } from "@/components/BandPill";
 import { AgentChat } from "@/components/AgentChat";
 import { WizardRail, type StageKey } from "@/components/WizardRail";
-import { WizardStep } from "@/components/WizardStep";
+import { RequirementPanel } from "@/components/RequirementPanel";
 import { RequestSummary } from "@/components/RequestSummary";
 import { BudgetFitPanel } from "@/components/BudgetFit";
 import { ScenarioCards } from "@/components/ScenarioCards";
@@ -21,12 +21,13 @@ export default function Workspace({ params }: { params: Promise<{ id: string }> 
   const { id } = use(params);
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [pendingMsg, setPendingMsg] = useState<string | null>(null);
   const { lines, running, run } = useOfferStream();
 
   useEffect(() => { getOffer(id).then(setSnap).catch((e) => setErr(String(e))); }, [id]);
 
   const offer = snap?.offer;
-  const intakeInt = snap?.interrupts.find((i) => i.type === "confirm_step");
+  const intakeInt = snap?.interrupts.find((i) => i.type === "agent_turn");
   const gate = snap?.interrupts.find((i) => i.type === "workspace_gate");
   const review = snap?.interrupts.find((i) => i.type === "human_review");
   const generated = offer?.workflow_status === "OFFER_GENERATED";
@@ -34,9 +35,16 @@ export default function Workspace({ params }: { params: Promise<{ id: string }> 
   const hasBudget = !!(offer?.proposed?.constraints ?? []).find(
     (c) => c.kind === "budget" || c.kind === "monthly_cap");
 
+  const fields = intakeInt?.field_state ?? snap?.field_state ?? [];
+  const pendingFields = intakeInt?.pending ?? [];
+  const FIELD_STAGE: Record<string, StageKey> = {
+    channel: "channel", customer: "partner", product: "product", asset: "asset",
+    term: "commercial", mileage: "commercial", quantity: "commercial",
+    special_payment: "commercial", maintenance: "commercial", tyres: "commercial", insurance: "commercial",
+  };
   const blocked = !intakeInt && !gate && !review && offer?.final_outcome === "BLOCKED";
   const stage: StageKey =
-    intakeInt?.step ? (intakeInt.step as StageKey)
+    intakeInt ? (FIELD_STAGE[pendingFields[0]] ?? "channel")
     : review || generated ? "review"
     : gate || priced ? "decide"
     : blocked ? "asset"
@@ -45,6 +53,10 @@ export default function Workspace({ params }: { params: Promise<{ id: string }> 
   async function intakeTurn(body: Record<string, unknown>) {
     const s = await run(`/offers/${id}/intake/stream`, body);
     if (s) setSnap(s);
+  }
+  async function sendChat(m: string) {
+    setPendingMsg(m);
+    try { await intakeTurn({ message: m }); } finally { setPendingMsg(null); }
   }
   async function selectScenario(label: string) {
     const s = await run(`/offers/${id}/select/stream`, { scenario_label: label });
@@ -107,11 +119,10 @@ export default function Workspace({ params }: { params: Promise<{ id: string }> 
           )}
 
           {intakeInt && (
-            <>
-              <WizardStep interrupt={intakeInt} running={running}
-                onConfirm={(ov) => intakeTurn({ confirm: true, overrides: ov })} />
-              <RequestSummary proposed={intakeInt.proposed} />
-            </>
+            <RequirementPanel fields={fields} busy={running}
+              onConfirmField={(f) => intakeTurn({ confirm_field: f })}
+              onProceed={() => intakeTurn({ proceed: true })}
+              onEdit={(ov) => intakeTurn({ overrides: ov })} />
           )}
 
           {!intakeInt && review && (
@@ -201,7 +212,7 @@ export default function Workspace({ params }: { params: Promise<{ id: string }> 
       {/* RIGHT — the agent, a fixed full-height rail; only its message log scrolls */}
       <aside className="obench-side">
         <AgentChat transcript={offer.transcript ?? []} lines={lines} running={running}
-          canSend={!!intakeInt} onSend={(m) => intakeTurn({ message: m })} />
+          canSend={!!intakeInt} onSend={sendChat} pendingMessage={pendingMsg} />
       </aside>
     </div>
   );

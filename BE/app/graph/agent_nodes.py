@@ -20,6 +20,7 @@ from langgraph.types import interrupt
 
 from app.agent import explain
 from app.agent.extract import understand
+from app.agent.turn import SET_KEYS as _TURN_SET_KEYS, plan_turn
 from app.agent.resolve import (
     customer_label,
     list_customers,
@@ -255,16 +256,132 @@ def understand_node(state) -> dict:
         proposed = _merge(proposed, understand(text))
     proposed = _resolve(proposed)
     transcript.append({"role": "assistant",
-                       "content": "Got it — let's build the offer step by step. Confirm each step or tell me a change."})
+                       "content": "Got it — I've filled in what I could. Confirm the fields, or just tell me "
+                                  "any change here in the chat (e.g. “48 months”, “change the customer to …”, "
+                                  "or “confirm all”)."})
     ac["messages"] = transcript
     ac["proposed"] = proposed
     offer.agent_context = ac
     offer.workflow_status = WorkflowStatus.UNDERSTANDING
     _persist(offer, "AGENT_UNDERSTOOD")
-    return {"offer": _dump(offer), "intake_ready": False, "step": "channel", "pending": None}
+    return {"offer": _dump(offer), "intake_ready": False, "pending": None}
 
 
-# --- per-step confirm gates -------------------------------------------------- #
+# --- single conversational intake turn (docs/16: state-driven, chat-first) --- #
+_AFFIRM = {"yes", "y", "yep", "yeah", "ok", "okay", "confirm", "confirmed", "confirm all",
+           "looks good", "sounds good", "correct", "sure", "do it", "agreed"}
+_PROCEED = {"proceed", "generate", "go ahead", "go", "continue", "price it", "next", "done"}
+
+
+def _detect_action(msg: str) -> str | None:
+    """Lightweight affirmation/intent detection so the chat can confirm/proceed even without an LLM."""
+    t = (msg or "").strip().lower().rstrip(".!")
+    if t in _PROCEED or any(t.startswith(p + " ") for p in _PROCEED):
+        return "proceed"
+    if t in _AFFIRM or t.startswith("confirm"):
+        return "confirm"
+    return None
+
+
+def agent_turn_node(state) -> dict:
+    """The whole intake as one conversational turn over a field-state model. The human can set,
+    confirm or edit ANY field here (chat or structured payload); an edit re-confirms only the fields it
+    affects. Loops until every required field is confirmed, then hands off to assemble."""
+    from app.agent import fieldstate as F
+    offer = _load(state)
+    ac = offer.agent_context
+    proposed = _resolve(dict(ac.get("proposed") or {}))
+    proposed.setdefault("channel", DEFAULT_CHANNEL)
+    proposed.setdefault("leasing_product", DEFAULT_PRODUCT)
+    fs = F.restore(ac, proposed)
+
+    reply = interrupt({
+        "type": "agent_turn", "reference": offer.reference,
+        "field_state": F.public(fs, proposed),
+        "pending": F.pending(fs),
+        "focus": (F.pending(fs) or [None])[0],
+        "proposed": proposed,
+        "ambiguities": proposed.get("ambiguities", []),
+        "transcript": ac.get("messages", []),
+    })
+
+    reply = reply if isinstance(reply, dict) else {"message": str(reply)}
+    before = dict(proposed)
+    user_fields: set[str] = set()
+
+    # structured payload (from a card / quick action)
+    for k, v in (reply.get("overrides") or {}).items():
+        if v not in (None, ""):
+            proposed[k] = v
+    user_fields |= F.fields_for_keys((reply.get("overrides") or {}).keys())
+    confirm_all = bool(reply.get("confirm"))
+    confirm_fields: list[str] = [reply["confirm_field"]] if reply.get("confirm_field") else []
+    proceed = bool(reply.get("proceed"))
+    agent_reply: str | None = None
+
+    # free-text chat turn — the agent interprets intent (set / confirm / proceed / answer questions)
+    msg = reply.get("message")
+    if msg:
+        ac.setdefault("messages", []).append({"role": "user", "content": msg})
+        plan = plan_turn(msg, F.summary(fs, proposed), F.options_summary())
+        if plan is not None:
+            for k, v in (plan.set or {}).items():
+                if k in _TURN_SET_KEYS and v not in (None, ""):
+                    proposed[k] = v
+            if "make" in plan.set or "model" in plan.set:
+                proposed["vehicle_key"] = None      # re-resolve the asset from the new make/model
+            if "company_hint" in plan.set:
+                proposed["register_number"] = None  # re-resolve the customer from the new name
+            user_fields |= F.fields_for_keys((plan.set or {}).keys())
+            confirm_fields += [f for f in (plan.confirm or []) if f in F.LABELS]
+            confirm_all = confirm_all or bool(plan.confirm_all)
+            proceed = proceed or bool(plan.proceed)
+            agent_reply = (plan.reply or "").strip() or None
+        else:                                       # no LLM: deterministic affirmation only
+            intent = understand(msg)
+            if intent is not None:
+                proposed = _merge(proposed, intent)
+            act = _detect_action(msg)
+            if act == "confirm":
+                confirm_all = True
+            elif act == "proceed":
+                proceed = True
+
+    # derive product hierarchy + re-resolve keys, then fold into the status map
+    proposed = F.derive_product(proposed, before)
+    proposed = _resolve(proposed)
+    user_fields |= F.changed_fields(before, proposed)          # any value the human's turn changed
+    fs, ripple = F.apply(fs, before, proposed, user_fields=user_fields,
+                         confirm=confirm_all, confirm_field=None)
+    for f in confirm_fields:                                    # per-field confirmations (chat or card)
+        if f in fs:
+            fs[f]["status"] = "confirmed"
+
+    # if the human asked to proceed, treat remaining agent-proposals as accepted
+    if proceed:
+        for f in fs:
+            if fs[f].get("status") == "proposed":
+                fs[f]["status"] = "confirmed"
+
+    if agent_reply:
+        nxt = F.next_prompt(fs, proposed)
+        line = agent_reply if ("price it" in agent_reply.lower() or nxt in agent_reply) \
+            else agent_reply.rstrip(". ") + ". " + nxt
+    else:
+        line = F.echo(ripple, fs, proposed)
+    if line:
+        ac.setdefault("messages", []).append({"role": "assistant", "content": line})
+
+    ready = F.is_ready(fs)
+    ac["proposed"] = proposed
+    ac["field_state"] = fs
+    offer.agent_context = ac
+    offer.workflow_status = WorkflowStatus.CONTEXT_COMPLETE if ready else WorkflowStatus.UNDERSTANDING
+    _persist(offer, "AGENT_TURN")
+    return {"offer": _dump(offer), "intake_ready": ready, "pending": None}
+
+
+# --- per-step confirm gates (legacy; retained for reference, not wired) ------- #
 def _is_empty(v) -> bool:
     if isinstance(v, tuple):
         return all(x in (None, "") for x in v)
@@ -509,9 +626,26 @@ def explain_pricing_node(state) -> dict:
     return {"offer": _dump(offer)}
 
 
+def _scenario_summary(offer: Offer) -> str | None:
+    """A quick, human summary of the priced options for the chat (a glanceable recap)."""
+    scns = [s for s in (offer.scenarios or []) if s.calculation]
+    if not scns:
+        return None
+    band = offer.scoring.value.band.value if offer.scoring else ""
+    lowest = min(scns, key=lambda s: s.calculation.value.monthly_gross_eur)
+    parts = [f"{s.label} €{s.calculation.value.monthly_gross_eur}/mo"
+             + (" (lowest)" if s.id == lowest.id else "") for s in scns]
+    return (f"Priced {len(scns)} option{'s' if len(scns) != 1 else ''} · band {band}: "
+            + " · ".join(parts)
+            + ". Pick one on the left, tell me which, or say “generate”.")
+
+
 def explain_scenarios_node(state) -> dict:
     offer = _load(state)
     offer.agent_context["explanation_scenarios"] = explain.explain_scenarios(offer)
+    summ = _scenario_summary(offer)
+    if summ:
+        offer.agent_context.setdefault("messages", []).append({"role": "assistant", "content": summ})
     _persist(offer, "AGENT_EXPLAINED_SCENARIOS")
     return {"offer": _dump(offer)}
 
@@ -523,7 +657,12 @@ def _compliance_blocked(offer: Offer) -> bool:
 
 # --- routers ----------------------------------------------------------------- #
 def route_after_understand(state) -> str:
-    return "run_pipeline" if state.get("intake_ready") else "select_channel"
+    return "run_pipeline" if state.get("intake_ready") else "agent_turn"
+
+
+def route_after_turn(state) -> str:
+    """One conversational intake turn: loop until every required field is confirmed, then assemble."""
+    return "assemble" if state.get("intake_ready") else "agent_turn"
 
 
 def _step_router(step: str):
@@ -548,4 +687,4 @@ def route_after_pipeline(state) -> str:
         return "scenarios"
     if _compliance_blocked(offer):
         return "final_validation"      # hard compliance block -> terminal
-    return "select_asset"              # economic RED / out-of-range -> reopen the wizard to adjust
+    return "agent_turn"                # economic RED / out-of-range -> reopen the chat to adjust

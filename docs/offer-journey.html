@@ -1,0 +1,274 @@
+<title>Leasedesk Offer Journey</title>
+<style>
+  :root{
+    color-scheme:light;
+    --ground:#f4f6f9; --surface:#ffffff; --ink:#1e1f21; --muted:#5b6270; --faint:#8b909c;
+    --hair:#e6e8ec; --brand:#4573d2; --brand-tx:#2c4a88;
+    --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --sans:"Figtree",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --agent-bg:#eeedfe; --agent-bd:#cecbf6; --agent-tx:#3c3489;
+    --human-bg:#e6f1fb; --human-bd:#b5d4f4; --human-tx:#0c447c;
+    --engine-bg:#eaf3de; --engine-bd:#c0dd97; --engine-tx:#27500a;
+    --gate-bg:#faeeda; --gate-bd:#fac775; --gate-tx:#633806;
+    --term-bg:#f1efe8; --term-bd:#d3d1c7; --term-tx:#444441;
+    --stop-bg:#fcebeb; --stop-bd:#f7c1c1; --stop-tx:#791f1f;
+  }
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    color-scheme:dark;
+    --ground:#0e0f13; --surface:#171a20; --ink:#eceef2; --muted:#a2a8b4; --faint:#6b7280;
+    --hair:#2a2f38; --brand:#7ea2ec; --brand-tx:#a9c2f2;
+    --agent-bg:#1a1830; --agent-bd:#332c66; --agent-tx:#b7aef0;
+    --human-bg:#10233a; --human-bd:#1d4266; --human-tx:#9cc4ef;
+    --engine-bg:#1a2610; --engine-bd:#3b5a1c; --engine-tx:#b7dd8f;
+    --gate-bg:#2a2010; --gate-bd:#5a441c; --gate-tx:#e6b463;
+    --term-bg:#1e1e1a; --term-bd:#3a3a33; --term-tx:#c9c8bf;
+    --stop-bg:#2a1414; --stop-bd:#5a2626; --stop-tx:#f0a3a3;
+  }}
+  :root[data-theme="dark"]{
+    color-scheme:dark;
+    --ground:#0e0f13; --surface:#171a20; --ink:#eceef2; --muted:#a2a8b4; --faint:#6b7280;
+    --hair:#2a2f38; --brand:#7ea2ec; --brand-tx:#a9c2f2;
+    --agent-bg:#1a1830; --agent-bd:#332c66; --agent-tx:#b7aef0;
+    --human-bg:#10233a; --human-bd:#1d4266; --human-tx:#9cc4ef;
+    --engine-bg:#1a2610; --engine-bd:#3b5a1c; --engine-tx:#b7dd8f;
+    --gate-bg:#2a2010; --gate-bd:#5a441c; --gate-tx:#e6b463;
+    --term-bg:#1e1e1a; --term-bd:#3a3a33; --term-tx:#c9c8bf;
+    --stop-bg:#2a1414; --stop-bd:#5a2626; --stop-tx:#f0a3a3;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);line-height:1.45}
+  .page{padding-block:22px;padding-inline:16px;max-width:1040px;margin-inline:auto}
+  h1{font-weight:600;font-size:22px;margin:0 0 4px;letter-spacing:-.01em}
+  h2{font-weight:600;font-size:16px;margin:26px 0 12px}
+  .lede{margin:0;color:var(--muted);font-size:13.5px}
+  .motto{color:var(--brand-tx);font-weight:500;font-size:12.5px;margin:6px 0 0}
+  .legend{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 4px}
+  .who{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;border-radius:999px;padding:3px 10px;border:1px solid}
+  .who .dot{width:8px;height:8px;border-radius:50%}
+  .w-agent{background:var(--agent-bg);border-color:var(--agent-bd);color:var(--agent-tx)} .w-agent .dot{background:var(--agent-tx)}
+  .w-human{background:var(--human-bg);border-color:var(--human-bd);color:var(--human-tx)} .w-human .dot{background:var(--human-tx)}
+  .w-engine{background:var(--engine-bg);border-color:var(--engine-bd);color:var(--engine-tx)} .w-engine .dot{background:var(--engine-tx)}
+  .w-gate{background:var(--gate-bg);border-color:var(--gate-bd);color:var(--gate-tx)} .w-gate .dot{background:var(--gate-tx)}
+  .w-term{background:var(--term-bg);border-color:var(--term-bd);color:var(--term-tx)} .w-term .dot{background:var(--term-tx)}
+  .w-stop{background:var(--stop-bg);border-color:var(--stop-bd);color:var(--stop-tx)} .w-stop .dot{background:var(--stop-tx)}
+
+  .flow{display:flex;flex-direction:column;align-items:stretch}
+  .node{border-radius:11px;border:1px solid var(--hair);background:var(--surface);padding:12px 14px}
+  .node .top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .node .step{font-family:var(--mono);font-size:11px;color:var(--faint)}
+  .node h3{font-size:14.5px;font-weight:600;margin:0}
+  .node .chip{margin-left:auto}
+  .node p{margin:7px 0 0;font-size:12.5px;color:var(--muted)}
+  .node code{font-family:var(--mono);font-size:11px}
+  .node.n-agent{border-left:4px solid var(--agent-tx)}
+  .node.n-human{border-left:4px solid var(--human-tx)}
+  .node.n-engine{border-left:4px solid var(--engine-tx)}
+  .node.n-gate{border-left:4px solid var(--gate-tx)}
+  .node.n-term{border-left:4px solid var(--term-tx)}
+  .chip{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;border-radius:999px;padding:2px 9px;border:1px solid}
+  .chip .dot{width:7px;height:7px;border-radius:50%}
+  .c-agent{background:var(--agent-bg);border-color:var(--agent-bd);color:var(--agent-tx)} .c-agent .dot{background:var(--agent-tx)}
+  .c-human{background:var(--human-bg);border-color:var(--human-bd);color:var(--human-tx)} .c-human .dot{background:var(--human-tx)}
+  .c-engine{background:var(--engine-bg);border-color:var(--engine-bd);color:var(--engine-tx)} .c-engine .dot{background:var(--engine-tx)}
+  .c-gate{background:var(--gate-bg);border-color:var(--gate-bd);color:var(--gate-tx)} .c-gate .dot{background:var(--gate-tx)}
+  .c-term{background:var(--term-bg);border-color:var(--term-bd);color:var(--term-tx)} .c-term .dot{background:var(--term-tx)}
+  .branches{display:flex;flex-direction:column;gap:5px;margin-top:9px}
+  .branch{display:flex;gap:7px;align-items:flex-start;font-size:11.5px;padding:5px 9px;border-radius:7px;background:var(--ground)}
+  .branch b{font-family:var(--mono);font-size:10.5px;font-weight:600;flex:none}
+  .branch.stop{background:var(--stop-bg);color:var(--stop-tx)}
+  .branch.loop{background:var(--gate-bg);color:var(--gate-tx)}
+  .conn{align-self:center;color:var(--faint);height:22px;display:flex;align-items:center}
+  .conn svg{width:20px;height:20px}
+  .substeps{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+  .sub{font-family:var(--mono);font-size:10.5px;background:var(--human-bg);color:var(--human-tx);border:1px solid var(--human-bd);border-radius:6px;padding:2px 7px}
+  .pipe{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px;align-items:center}
+  .pstep{font-family:var(--mono);font-size:10.5px;background:var(--engine-bg);color:var(--engine-tx);border:1px solid var(--engine-bd);border-radius:6px;padding:2px 7px}
+  .pipe .sep{color:var(--faint);font-size:11px}
+
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:720px){.cards{grid-template-columns:1fr}}
+  .card{border:1px solid var(--hair);border-radius:11px;background:var(--surface);padding:14px}
+  .card h4{margin:0 0 10px;font-size:13.5px;font-weight:600}
+  .kv{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px dashed var(--hair);font-size:12px}
+  .kv:last-child{border-bottom:0}
+  .kv .k{color:var(--muted)} .kv .v{font-family:var(--mono);font-size:11px;text-align:right}
+  .frow{font-size:12px;padding:6px 0;border-bottom:1px dashed var(--hair)}
+  .frow:last-child{border-bottom:0}
+  .frow .lbl{font-weight:500} .frow .f{font-family:var(--mono);font-size:11px;color:var(--brand-tx);margin-top:3px;display:block;overflow-wrap:anywhere}
+  .cap{font-size:11px;color:var(--faint);margin-top:6px}
+</style>
+
+<div class="page">
+  <h1>Leasedesk — offer journey, decisions &amp; math</h1>
+  <p class="lede">From a plain-language request to a generated (or blocked) offer: every stage, who decides it, the branches, and the formulas the engine runs.</p>
+  <p class="motto">AI assists (extracts &amp; explains) · Rules decide (engine &amp; policy) · Humans govern (confirm &amp; review).</p>
+
+  <div class="legend">
+    <span class="who w-human"><span class="dot"></span>Human — salesperson (SALES)</span>
+    <span class="who w-agent"><span class="dot"></span>Agent — LLM (extract / explain only)</span>
+    <span class="who w-engine"><span class="dot"></span>Engine — deterministic rules &amp; math</span>
+    <span class="who w-gate"><span class="dot"></span>Decision gate — human-in-loop</span>
+    <span class="who w-term"><span class="dot"></span>Terminal</span>
+  </div>
+
+  <div class="flow">
+
+    <div class="node n-human">
+      <div class="top"><span class="step">start</span><h3>Start an offer</h3><span class="chip c-human"><span class="dot"></span>human</span></div>
+      <p>Salesperson opens the workbench and types the request in plain language (e.g. “3 BMW X1 for Musterlogistik, 36 months, 20,000 km/yr, with maintenance &amp; insurance”). <code>POST /offers/nl</code>.</p>
+    </div>
+    <div class="conn"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v14"/><path d="M5 12l5 5 5-5"/></svg></div>
+
+    <div class="node n-agent">
+      <div class="top"><span class="step">understand</span><h3>Agent extracts the request</h3><span class="chip c-agent"><span class="dot"></span>agent · LLM</span></div>
+      <p>LLM (OpenRouter) → <code>ExtractedIntent</code>: slots, <code>asset_filters</code>, <code>constraints</code> (budget/cap), <code>ambiguities</code>. It structures only — it never prices, scores, approves, or picks a catalogue item. No key? deterministic <code>resolve</code> maps names→keys; unclear → asks.</p>
+      <div class="branches"><div class="branch"><b>edge</b><span>No LLM configured or unclear input → agent records an ambiguity and asks the human instead of guessing.</span></div></div>
+    </div>
+    <div class="conn"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v14"/><path d="M5 12l5 5 5-5"/></svg></div>
+
+    <div class="node n-human">
+      <div class="top"><span class="step">select_* · interrupt()</span><h3>Five confirm gates</h3><span class="chip c-gate"><span class="dot"></span>human confirms each</span></div>
+      <p>The agent pre-fills each step; the human confirms or changes it. Every step pauses the graph (<code>interrupt()</code>); any confirmed step can be re-opened (<code>goto</code>) and edits are tagged in the chat.</p>
+      <div class="substeps"><span class="sub">channel</span><span class="sub">partner / customer</span><span class="sub">product</span><span class="sub">asset</span><span class="sub">commercial</span></div>
+      <div class="branches"><div class="branch loop"><b>goto</b><span>Human jumps back to any earlier step to edit → re-confirms forward.</span></div></div>
+    </div>
+    <div class="conn"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v14"/><path d="M5 12l5 5 5-5"/></svg></div>
+
+    <div class="node n-engine">
+      <div class="top"><span class="step">assemble → run_pipeline</span><h3>Deterministic pipeline</h3><span class="chip c-engine"><span class="dot"></span>engine · rules decide</span></div>
+      <p>The confirmed requirement is frozen and priced by policy <code>DE_PKW_V1</code> — no AI in this path. Ordered stages:</p>
+      <div class="pipe">
+        <span class="pstep">completeness</span><span class="sep">→</span>
+        <span class="pstep">customer context</span><span class="sep">→</span>
+        <span class="pstep">residual</span><span class="sep">→</span>
+        <span class="pstep">eligibility</span><span class="sep">→</span>
+        <span class="pstep">asset assessment</span><span class="sep">→</span>
+        <span class="pstep">scoring G/Y/R</span><span class="sep">→</span>
+        <span class="pstep">funding</span><span class="sep">→</span>
+        <span class="pstep">margin</span><span class="sep">→</span>
+        <span class="pstep">calculate</span>
+      </div>
+      <div class="branches">
+        <div class="branch stop"><b>hard block</b><span>Sanctions match · KYC failed · insolvency · asset assessment unavailable · special payment &gt;30% · price &gt;150k → RED, offer <b>BLOCKED</b> (terminal).</span></div>
+        <div class="branch loop"><b>review</b><span>Soft flags (YELLOW risk, high-value &gt;100k, low residual confidence, mileage/special-payment review, manual scoring) → priced, but need human review.</span></div>
+        <div class="branch"><b>missing</b><span>Material field absent → <code>CONTEXT_REQUIRED</code>, back to the wizard.</span></div>
+      </div>
+    </div>
+    <div class="conn"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v14"/><path d="M5 12l5 5 5-5"/></svg></div>
+
+    <div class="node n-engine">
+      <div class="top"><span class="step">scenarios → explain</span><h3>Scenarios &amp; explanation</h3><span class="chip c-engine"><span class="dot"></span>engine + agent</span></div>
+      <p>Engine builds variants around the requested term (nearest valid terms) honoring the customer's choices, adds an all-inclusive bundle when services are open, tags budget-fit. The agent then writes a grounded, numbers-based explanation.</p>
+    </div>
+    <div class="conn"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v14"/><path d="M5 12l5 5 5-5"/></svg></div>
+
+    <div class="node n-gate">
+      <div class="top"><span class="step">workspace_gate · interrupt()</span><h3>Pick &amp; decide</h3><span class="chip c-gate"><span class="dot"></span>human</span></div>
+      <p>The salesperson selects a scenario, adjusts with the agent, or generates. Nothing is locked.</p>
+      <div class="branches">
+        <div class="branch loop"><b>adjust</b><span>Re-opens the Asset step → wizard → re-prices through the pipeline.</span></div>
+      </div>
+    </div>
+    <div class="conn"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v14"/><path d="M5 12l5 5 5-5"/></svg></div>
+
+    <div class="node n-human">
+      <div class="top"><span class="step">human_review · interrupt()</span><h3>Mandatory human review</h3><span class="chip c-gate"><span class="dot"></span>human governs</span></div>
+      <p>Required before any offer is generated (BR-15). The human sees the complete offer + all exceptions and decides. Generation is blocked here if the outcome is <code>BLOCKED</code>.</p>
+      <div class="branches">
+        <div class="branch loop"><b>return</b><span>Send back for correction → workspace_gate (rework, re-review).</span></div>
+        <div class="branch"><b>confirm</b><span>Accept (accepts any soft flags) → final validation.</span></div>
+      </div>
+    </div>
+    <div class="conn"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v14"/><path d="M5 12l5 5 5-5"/></svg></div>
+
+    <div class="node n-engine">
+      <div class="top"><span class="step">final_validation</span><h3>Final outcome</h3><span class="chip c-engine"><span class="dot"></span>engine</span></div>
+      <p>Recomputes the outcome: <code>READY</code> · <code>REQUIRES_ACTION</code> · <code>BLOCKED</code>. Only a non-blocked, human-confirmed offer proceeds to generate.</p>
+    </div>
+    <div class="conn"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v14"/><path d="M5 12l5 5 5-5"/></svg></div>
+
+    <div class="node n-term">
+      <div class="top"><span class="step">generate_offer → END</span><h3>Offer generated</h3><span class="chip c-term"><span class="dot"></span>terminal</span></div>
+      <p>A frozen offer snapshot is saved (→ PDF) and the workflow ends. Every stage along the way appended to the append-only <code>audit_events</code>.</p>
+    </div>
+
+  </div>
+
+  <h2>Who decides what</h2>
+  <div class="cards">
+    <div class="card">
+      <h4>Agent — assists (never decides)</h4>
+      <div class="kv"><span class="k">Extract NL → structured intent</span><span class="v">LLM</span></div>
+      <div class="kv"><span class="k">Explain pricing &amp; scenarios</span><span class="v">LLM, grounded</span></div>
+      <div class="kv"><span class="k">Resolve names → catalogue keys</span><span class="v">deterministic</span></div>
+      <div class="kv"><span class="k">Price / score / approve / pick asset</span><span class="v">never</span></div>
+    </div>
+    <div class="card">
+      <h4>Human — governs</h4>
+      <div class="kv"><span class="k">Confirm each of 5 steps</span><span class="v">interrupt()</span></div>
+      <div class="kv"><span class="k">Edit a confirmed step</span><span class="v">goto</span></div>
+      <div class="kv"><span class="k">Pick scenario / adjust</span><span class="v">workspace_gate</span></div>
+      <div class="kv"><span class="k">Review before generation</span><span class="v">mandatory</span></div>
+    </div>
+  </div>
+
+  <h2>The math — engine formulas (DE_PKW_V1)</h2>
+  <div class="cards">
+    <div class="card">
+      <h4>Residual value (DE_PKW_RV_V1)</h4>
+      <div class="frow"><span class="lbl">RV%</span><span class="f">base_term_RV + mileage_adj + age_adj, clamp[20,80]</span></div>
+      <div class="frow"><span class="lbl">Base RV by term</span><span class="f">12→80 · 24→68 · 36→58 · 48→49 · 60→41 %</span></div>
+      <div class="frow"><span class="lbl">Mileage adj (base 15,000)</span><span class="f">−2.5pp / +5000km (cap −15) · +1.5pp / −5000km (cap +5)</span></div>
+      <div class="frow"><span class="lbl">RV amount</span><span class="f">list_price_net × RV%</span></div>
+      <div class="frow"><span class="lbl">Confidence</span><span class="f">HIGH / MEDIUM / LOW → funding spread + term cap</span></div>
+    </div>
+    <div class="card">
+      <h4>Rate build-up</h4>
+      <div class="frow"><span class="lbl">Funding rate</span><span class="f">reference_rate + term_spread + asset_uncertainty_spread</span></div>
+      <div class="frow"><span class="lbl">Term spread</span><span class="f">0.35 / 0.50 / 0.70 / 0.90 pp by term band</span></div>
+      <div class="frow"><span class="lbl">Asset spread</span><span class="f">HIGH 0 · MEDIUM 0.30 · LOW 0.60 pp</span></div>
+      <div class="frow"><span class="lbl">Commercial margin</span><span class="f">1.50 + risk_adj + deal_size_adj, clamp[1.00,3.50]</span></div>
+      <div class="frow"><span class="lbl">Customer finance rate</span><span class="f">funding_rate + commercial_margin</span></div>
+    </div>
+    <div class="card">
+      <h4>Lease calculation (MVP_LEASE_CALC_V1)</h4>
+      <div class="frow"><span class="lbl">Monthly rate r</span><span class="f">finance_rate / 100 / 12</span></div>
+      <div class="frow"><span class="lbl">NetCap</span><span class="f">acq + financed_fees − discount − special_payment</span></div>
+      <div class="frow"><span class="lbl">PV(residual)</span><span class="f">RV_amount / (1+r)^n</span></div>
+      <div class="frow"><span class="lbl">Base lease</span><span class="f">(NetCap − PV_RV) × r / (1 − (1+r)^−n)</span></div>
+      <div class="frow"><span class="lbl">+ services / VAT</span><span class="f">maint €39 · tyres €19 · ins 3.5%/yr of list ÷12 · ×(1+VAT)</span></div>
+      <div class="cap">Guard: if NetCap ≤ PV(residual) → special payment too high → blocked.</div>
+    </div>
+    <div class="card">
+      <h4>Risk scoring (DE_PKW_RISK_V1)</h4>
+      <div class="frow"><span class="lbl">Hard blocks → RED</span><span class="f">sanctions match · KYC failed · insolvency</span></div>
+      <div class="frow"><span class="lbl">Weighted 0–100</span><span class="f">credit .40 · financial .25 · exposure .15 · age .10 · payment .10</span></div>
+      <div class="frow"><span class="lbl">Bands</span><span class="f">GREEN ≥75 · YELLOW 55–74.99 · RED ≤54.99</span></div>
+      <div class="frow"><span class="lbl">Auto vs manual (§3.11)</span><span class="f">exposure ≤500k · qty ≤10 · unit ≤100k → else manual review</span></div>
+      <div class="cap">The band is decided by this model — never copied from the bureau.</div>
+    </div>
+  </div>
+
+  <h2>Constraints &amp; edge cases (eligibility gates)</h2>
+  <div class="cards">
+    <div class="card">
+      <h4>Hard blocks (terminal / not overridable)</h4>
+      <div class="kv"><span class="k">Sanctions / KYC / insolvency</span><span class="v">RED compliance</span></div>
+      <div class="kv"><span class="k">Asset assessment unavailable</span><span class="v">retry</span></div>
+      <div class="kv"><span class="k">Special payment &gt; 30%</span><span class="v">block</span></div>
+      <div class="kv"><span class="k">Quantity outside 1–50</span><span class="v">block</span></div>
+      <div class="kv"><span class="k">Price &lt;10k or &gt;150k · wrong category · age&gt;8y at end</span><span class="v">block</span></div>
+      <div class="kv"><span class="k">NetCap ≤ PV(residual)</span><span class="v">block</span></div>
+    </div>
+    <div class="card">
+      <h4>Soft flags (priced → human review)</h4>
+      <div class="kv"><span class="k">YELLOW risk band</span><span class="v">review</span></div>
+      <div class="kv"><span class="k">High value &gt; 100k</span><span class="v">review</span></div>
+      <div class="kv"><span class="k">Special payment 20–30%</span><span class="v">review</span></div>
+      <div class="kv"><span class="k">Term / mileage out of range</span><span class="v">review*</span></div>
+      <div class="kv"><span class="k">Residual LOW confidence</span><span class="v">review · term≤48</span></div>
+      <div class="kv"><span class="k">Manual scoring pattern</span><span class="v">review</span></div>
+    </div>
+  </div>
+  <p class="cap">*term/mileage out of the absolute range is blocking-but-overridable by a reviewer; below-minimum mileage is a non-blocking review. Economic RED (low score) is reworkable via Adjust; compliance RED is a hard stop.</p>
+</div>

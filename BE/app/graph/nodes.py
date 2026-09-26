@@ -78,7 +78,7 @@ def workspace_gate_node(state: OfferState) -> dict:
         "can_generate": offer.selected_scenario_id is not None,
         "generated": offer.workflow_status is WorkflowStatus.OFFER_GENERATED,
     })
-    a = (action.get("action") if isinstance(action, dict) else str(action)).lower()
+    a = ((action.get("action") if isinstance(action, dict) else str(action)) or "").lower()
 
     if a == "generate" and offer.selected_scenario_id is not None:
         # generation now goes THROUGH the human-review gate (BR-15); finalize is set there, not here.
@@ -131,7 +131,7 @@ def human_review_node(state: OfferState) -> dict:
                    if can_generate else
                    "This offer cannot be generated while a blocking condition remains. Return to correct it."),
     })
-    d = (decision.get("decision") if isinstance(decision, dict) else str(decision)).lower()
+    d = ((decision.get("decision") if isinstance(decision, dict) else str(decision)) or "").lower()
     ac = offer.agent_context
     if d in ("confirm", "approve", "generate") and can_generate:
         ac["last_review"] = {"decision": "confirmed", "outcome": outcome.value}
@@ -183,10 +183,8 @@ def route_after_gate(state: OfferState) -> str:
     a = state.get("gate_action")
     if a == "generate":
         return "human_review"        # generation goes THROUGH the mandatory review gate (BR-15)
-    if a == "adjust":
-        return "select_asset"        # reopen the wizard (asset -> commercial -> re-price)
-    if a == "goto" and state.get("goto_step") in _WIZARD_STEPS:
-        return f"select_{state['goto_step']}"   # jump straight back to a chosen step
+    if a in ("adjust", "goto"):
+        return "agent_turn"          # reopen the conversational intake to edit any field, then re-price
     return "workspace_gate"          # select / default -> stay at the hub
 
 

@@ -97,10 +97,13 @@ class CreateOfferNL(BaseModel):
 
 
 class IntakeTurn(BaseModel):
-    """One conversational intake turn: a free-text message, an optional confirm, and/or explicit
-    overrides picked from the catalogue (vehicle_key, register_number, term_months, ...)."""
+    """One conversational intake turn: a free-text message, confirmations, and/or explicit overrides
+    picked from the catalogue (vehicle_key, register_number, term_months, ...). `confirm` accepts all
+    pending fields; `confirm_field` accepts one; `proceed` accepts remaining proposals and prices."""
     message: Optional[str] = None
     confirm: bool = False
+    confirm_field: Optional[str] = None
+    proceed: bool = False
     overrides: Optional[dict] = None
 
 
@@ -234,11 +237,14 @@ def _snapshot(thread_id: str) -> dict:
     for task in snap.tasks:
         for it in (task.interrupts or []):
             interrupts.append(it.value)
+    offer_dict = values.get("offer") or {}
+    field_state = (offer_dict.get("agent_context") or {}).get("field_state")
     return {
         "thread_id": thread_id,
         "next": list(snap.next),
         "status": "awaiting_input" if snap.next else "complete",
         "step": values.get("step"),
+        "field_state": field_state,
         "interrupts": interrupts,
         "offer": _summary(values["offer"]) if values.get("offer") else None,
     }
@@ -252,11 +258,7 @@ def _email_to_id(email: str, role: Role) -> str:
 # --- SSE live agent feed ------------------------------------------------------ #
 _NODE_LABELS = {
     "understand": "Understanding the request",
-    "select_channel": "Confirm sales channel",
-    "select_partner": "Confirm customer / partner",
-    "select_product": "Confirm business line & product",
-    "select_asset": "Confirm asset",
-    "select_commercial": "Confirm commercial requirements",
+    "agent_turn": "Working through the request",
     "assemble": "Assembling the offer",
     "run_pipeline": "Assembling context, scoring risk & pricing",
     "explain_pricing": "Explaining the pricing",
@@ -275,14 +277,15 @@ def _node_line(node: str, delta: dict) -> dict:
     offer_dict = delta.get("offer") if isinstance(delta, dict) else None
     if offer_dict:
         o = Offer.model_validate(offer_dict)
-        if o.scoring:
-            out["band"] = o.scoring.value.band.value
-            out["score"] = str(o.scoring.value.mvp_risk_score)
-        if o.calculation:
-            c = o.calculation.value
-            out["detail"] = (f"rate {c.customer_finance_rate_pct}% · "
-                             f"€{c.monthly_gross_eur}/mo gross")
-        if node == "scenarios" and o.scenarios:
+        # Attach salient numbers ONLY to the node that produces them — not to every row.
+        if node == "run_pipeline":
+            if o.scoring:
+                out["band"] = o.scoring.value.band.value
+                out["score"] = str(o.scoring.value.mvp_risk_score)
+            if o.calculation:
+                c = o.calculation.value
+                out["detail"] = f"rate {c.customer_finance_rate_pct}% · €{c.monthly_gross_eur}/mo gross"
+        elif node == "scenarios" and o.scenarios:
             out["detail"] = f"{len(o.scenarios)} options priced"
     return out
 

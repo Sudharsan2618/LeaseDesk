@@ -137,12 +137,25 @@ export interface PartnerCandidate { register_number: string; legal_name: string;
 export interface Ambiguity { field: string; reason: string; options?: string[]; }
 export interface ConstraintRow { kind: string; value?: number | null; currency?: string | null; basis?: string | null; note?: string | null; }
 
+export type FieldStatus = "unset" | "proposed" | "confirmed" | "stale";
+export interface FieldRow {
+  field: string;
+  label: string;
+  status: FieldStatus;
+  value: string | number | boolean | null;
+  required: boolean;
+}
+
 export interface Interrupt {
   type: "confirm_step" | "human_review" | "workspace_gate" | "agent_turn";
   reference: string;
   proposed?: Proposed;
   transcript?: ChatMessage[];
   missing?: string[];
+  // agent_turn (state-driven intake)
+  field_state?: FieldRow[];
+  pending?: string[];
+  focus?: string | null;
   // confirm_step
   step?: StepKey;
   title?: string;
@@ -214,6 +227,7 @@ export interface Snapshot {
   next: string[];
   status: "awaiting_input" | "complete";
   step?: StepKey | null;
+  field_state?: FieldRow[] | null;
   interrupts: Interrupt[];
   offer: OfferSummary | null;
 }
