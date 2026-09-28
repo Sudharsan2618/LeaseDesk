@@ -471,12 +471,21 @@ def budget_fit(thread_id: str):
     enumerates candidates, the deterministic engine prices each, we rank — the agent never prices."""
     from app.engine.budget import catalogue_budget_fit, extract_budget
     from app.graph.agent_nodes import _filter_catalogue, _REGISTRY
+    from app.agent.resolve import list_vehicles
     snap = graph.get_state(_cfg(thread_id))
     if not snap.values.get("offer"):
         raise HTTPException(404, "offer/thread not found")
     o = Offer.model_validate(snap.values["offer"])
     proposed = (o.agent_context or {}).get("proposed") or {}
-    candidate_keys = [r["key"] for r in _filter_catalogue(proposed)]
+    was_default_recommendation = any(
+        "lowest listed-price option in this demo catalogue" in (m.get("content") or "")
+        for m in ((o.agent_context or {}).get("messages") or [])
+        if m.get("role") == "assistant")
+    show_all_assets = proposed.get("vehicle_recommended") or (
+        "vehicle_recommended" not in proposed and was_default_recommendation)
+    candidates = (list_vehicles() if show_all_assets
+                  else _filter_catalogue(proposed))
+    candidate_keys = [r["key"] for r in candidates]
     return {
         "budget": (lambda b: {"value": str(b["value"]), "basis": b["basis"], "currency": b["currency"]}
                    if b else None)(extract_budget(o)),

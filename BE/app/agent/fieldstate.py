@@ -46,7 +46,7 @@ def _value(field: str, proposed: dict):
 def display(field: str, proposed: dict):
     v = _value(field, proposed)
     if field == "customer":
-        return customer_label(v) or v
+        return customer_label(v) or v or proposed.get("company_hint")
     if field == "asset":
         return vehicle_label(v) or v
     if field in ("channel", "product"):
@@ -131,7 +131,7 @@ def apply(fs: dict, before: dict, after: dict, *, user_fields: set[str],
             elif fs.get(dep, {}).get("status") == "confirmed":
                 fs[dep]["status"] = "stale"
                 ripple["invalidated"].append(dep)
-    if confirm_field and confirm_field in fs:
+    if confirm_field and confirm_field in fs and _has(confirm_field, after):
         fs[confirm_field]["status"] = "confirmed"
     if confirm:
         for f in fs:
@@ -154,6 +154,7 @@ def public(fs: dict, proposed: dict) -> list[dict]:
     return [{
         "field": f, "label": LABELS[f], "status": fs.get(f, {}).get("status", "unset"),
         "value": display(f, proposed), "required": f in REQUIRED,
+        "option_key": _value(f, proposed) if f in ("customer", "asset") else None,
     } for f in ORDER]
 
 
@@ -169,7 +170,11 @@ def options_summary() -> str:
     ref = load_reference_data()
     ch = ", ".join(c.name_en for c in ref.channels)
     pr = ", ".join(p.name_en for p in ref.leasing_products)
-    return f"channels: {ch}\nproducts: {pr}"
+    from app.agent.resolve import list_customers, list_vehicles
+    customers = ", ".join(c["legal_name"] for c in list_customers())
+    vehicles = ", ".join(v["label"] for v in list_vehicles())
+    return (f"channels: {ch}\nproducts: {pr}\ncustomers: {customers}\n"
+            f"vehicles: {vehicles}")
 
 
 def next_prompt(fs: dict, proposed: dict) -> str:

@@ -17,7 +17,7 @@ class Constraint(BaseModel):
     kind: str = Field(description="budget | monthly_cap | delivery | other")
     value: Optional[float] = Field(None, description="numeric value if any, e.g. 300000")
     currency: Optional[str] = Field(None, description="currency as stated, e.g. '$', 'EUR' — leave as written")
-    basis: Optional[str] = Field(None, description="total | monthly | per_vehicle | unknown")
+    basis: Optional[str] = Field(None, description="annual | monthly | per_vehicle | total | acquisition | unknown")
     note: Optional[str] = Field(None, description="free-text detail if it doesn't fit above")
 
 

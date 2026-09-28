@@ -1,5 +1,6 @@
 {
   "_note": "B2B personas for deterministic KYC/sanctions/credit mocks (docs/03 §5). Each exercises a branch of the risk/exception logic. Keyed by register_number.",
+  "_defaults": { "recommended_customer": "HRB-1001" },
   "companies": {
     "HRB-1001": {
       "persona": "GREEN_B2B",
@@ -50,6 +51,26 @@
       "sanctions": { "match": false, "hits": [] },
       "kyc": { "identity_verified": false, "representative_established": false, "ubo_established": false, "pep_match": false, "kyc_status": "FAILED" },
       "credit": { "credit_index": 55, "default_probability": "0.06", "recommended_limit_eur": "80000", "financial_strength": 50, "company_age_years": 3, "payment_history_score": 55, "negatives": [], "insolvency_flag": false }
+    },
+    "DEMO-ACME": {
+      "persona": "GREEN_B2B_DEMO",
+      "legal_name": "Acme Inc.",
+      "legal_form": "Inc.",
+      "vat_id": "DE600000006",
+      "address": "Demo address, Berlin",
+      "sanctions": { "match": false, "hits": [] },
+      "kyc": { "identity_verified": true, "representative_established": true, "ubo_established": true, "pep_match": false, "kyc_status": "COMPLETE" },
+      "credit": { "credit_index": 88, "default_probability": "0.011", "recommended_limit_eur": "250000", "financial_strength": 82, "company_age_years": 14, "payment_history_score": 90, "negatives": [], "insolvency_flag": false }
+    },
+    "DEMO-APEX": {
+      "persona": "GREEN_B2B_DEMO",
+      "legal_name": "Apex",
+      "legal_form": "Demo company",
+      "vat_id": "DE700000007",
+      "address": "Demo address, Berlin",
+      "sanctions": { "match": false, "hits": [] },
+      "kyc": { "identity_verified": true, "representative_established": true, "ubo_established": true, "pep_match": false, "kyc_status": "COMPLETE" },
+      "credit": { "credit_index": 88, "default_probability": "0.011", "recommended_limit_eur": "2500000", "financial_strength": 82, "company_age_years": 14, "payment_history_score": 90, "negatives": [], "insolvency_flag": false }
     }
   }
 }

@@ -6,6 +6,7 @@ identifiers; it only hints, and we look them up.
 """
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Optional
 
 from app.integration._fixtures import load
@@ -83,6 +84,45 @@ def list_customers() -> list[dict]:
          "label": f"{c['legal_name']} ({reg})"}
         for reg, c in load("companies.json")["companies"].items()
     ]
+
+
+def recommend_default_customer(min_recommended_limit_eur: Decimal | None = None) -> Optional[dict]:
+    """Return a safe mock customer recommendation, optionally sized to preliminary exposure."""
+    catalogue = load("companies.json")
+    companies = catalogue.get("companies") or {}
+    if min_recommended_limit_eur is not None:
+        eligible = []
+        for register, company in companies.items():
+            credit = company.get("credit") or {}
+            kyc = company.get("kyc") or {}
+            sanctions = company.get("sanctions") or {}
+            persona = company.get("persona", "")
+            if (not persona.startswith("GREEN") or kyc.get("kyc_status") != "COMPLETE"
+                    or not kyc.get("identity_verified") or sanctions.get("match")):
+                continue
+            limit = Decimal(str(credit.get("recommended_limit_eur") or "0"))
+            if limit >= min_recommended_limit_eur:
+                eligible.append((limit, company["legal_name"], register, company))
+        if eligible:
+            limit, _, register, company = min(eligible, key=lambda row: (row[0], row[1]))
+            return {
+                "register_number": register,
+                "legal_name": company["legal_name"],
+                "label": f"{company['legal_name']} ({register})",
+                "recommended_limit_eur": limit,
+                "demo_risk_band": "GREEN",
+            }
+        return None
+
+    register = (catalogue.get("_defaults") or {}).get("recommended_customer")
+    company = companies.get(register)
+    if not company or not register:
+        return None
+    return {
+        "register_number": register,
+        "legal_name": company["legal_name"],
+        "label": f"{company['legal_name']} ({register})",
+    }
 
 
 def vehicle_label(key: Optional[str]) -> Optional[str]:

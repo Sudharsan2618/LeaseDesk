@@ -16,7 +16,7 @@ export function BlockedPanel({
   canAdjust?: boolean;
 }) {
   const blocking = exceptions.filter((e) => e.blocking);
-  const terminal = blocking.some((e) => isTerminalBlock(e.code));
+  const terminal = blocking.some((e) => isTerminalBlock(e));
   const rows = blocking.length ? blocking : exceptions.slice(0, 1);
 
   return (

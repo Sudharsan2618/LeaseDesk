@@ -143,6 +143,7 @@ export interface FieldRow {
   label: string;
   status: FieldStatus;
   value: string | number | boolean | null;
+  option_key?: string | null;
   required: boolean;
 }
 

@@ -14,6 +14,7 @@ repository.upsert_offer.
 """
 from __future__ import annotations
 
+import re
 from decimal import Decimal, InvalidOperation
 
 from langgraph.types import interrupt
@@ -25,6 +26,7 @@ from app.agent.resolve import (
     customer_label,
     list_customers,
     list_vehicles,
+    recommend_default_customer,
     resolve_register,
     resolve_vehicle_key,
     search_partners,
@@ -126,7 +128,7 @@ def _num(x):
         return None
 
 
-def _merge(proposed: dict, intent) -> dict:
+def _merge(proposed: dict, intent, *, source_text: str = "") -> dict:
     """Merge a fresh extraction into the running proposal (new non-null values win).
 
     When the make/model changes, DROP the stale vehicle_key so it re-resolves; same for the customer
@@ -140,14 +142,19 @@ def _merge(proposed: dict, intent) -> dict:
             proposed["model"] = intent.model
         proposed["vehicle_key"] = None
         proposed["colour"] = None
+        proposed["vehicle_recommended"] = False
     if intent.colour:
         proposed["colour"] = intent.colour
     if intent.company_hint:
         proposed["company_hint"] = intent.company_hint
         proposed["register_number"] = None
+        proposed["customer_recommended"] = False
     if intent.objective:
         proposed["objective"] = intent.objective
-    if intent.term_months:
+    years = re.search(r"\b(\d+)\s*(?:years?|yrs?)\b", source_text.lower()) if source_text else None
+    if years:
+        proposed["term_months"] = int(years.group(1)) * 12
+    elif intent.term_months:
         proposed["term_months"] = intent.term_months
     if intent.annual_mileage_km:
         proposed["annual_mileage_km"] = intent.annual_mileage_km
@@ -164,9 +171,25 @@ def _merge(proposed: dict, intent) -> dict:
         filters = dict(proposed.get("filters") or {})
         filters.update({k: v for k, v in intent.asset_filters.items() if v not in (None, "")})
         proposed["filters"] = filters
+        proposed["vehicle_recommended"] = False
     if getattr(intent, "constraints", None):
         proposed["constraints"] = [c.model_dump() if hasattr(c, "model_dump") else c
                                    for c in intent.constraints]
+        text = source_text.lower()
+        if any(p in text for p in ("per year", "a year", "annual", "annually", "yearly", "/year")):
+            basis = "annual"
+        elif any(p in text for p in ("per month", "a month", "monthly", "/month")):
+            basis = "monthly"
+        elif "per vehicle" in text or "per car" in text:
+            basis = "per_vehicle"
+        elif any(p in text for p in ("whole contract", "total contract", "over the contract")):
+            basis = "total"
+        else:
+            basis = None
+        if basis:
+            for constraint in proposed["constraints"]:
+                if (constraint.get("kind") or "").lower() in ("budget", "monthly_cap"):
+                    constraint["basis"] = basis
     if getattr(intent, "ambiguities", None):
         proposed["ambiguities"] = [a.model_dump() if hasattr(a, "model_dump") else a
                                    for a in intent.ambiguities]
@@ -178,9 +201,189 @@ def _merge(proposed: dict, intent) -> dict:
 def _resolve(proposed: dict) -> dict:
     if not proposed.get("vehicle_key"):
         proposed["vehicle_key"] = resolve_vehicle_key(proposed.get("make"), proposed.get("model"))
+    if not proposed.get("vehicle_key") and proposed.get("filters"):
+        matches = _filter_catalogue(proposed)
+        if len(matches) == 1:
+            proposed["vehicle_key"] = matches[0]["key"]
+            proposed["make"] = matches[0]["make"]
+            proposed["model"] = matches[0]["commercial_name"]
     if not proposed.get("register_number"):
         proposed["register_number"] = resolve_register(proposed.get("company_hint"))
     return proposed
+
+
+def _catalogue_answer(message: str, proposed: dict) -> str | None:
+    """Answer catalogue questions from the same controlled data used by the intake UI."""
+    text = (message or "").lower()
+    asks_options = any(word in text for word in ("option", "available", "list", "which", "what are"))
+    if not asks_options:
+        return None
+    if any(word in text for word in ("customer", "company", "partner", "client")):
+        rows = list_customers()
+        names = "; ".join(f'{c["legal_name"]} ({c["register_number"]})' for c in rows)
+        return (f"The current demo customer directory has {len(rows)} options: {names}. "
+                "These are seeded mock records; tell me the customer name you want to use.")
+    if any(word in text for word in ("vehicle", "car", "asset", "model")):
+        rows = list_vehicles()
+        return "The current demo vehicle catalogue has: " + "; ".join(v["label"] for v in rows) + "."
+    if "channel" in text:
+        ref = load_reference_data()
+        choices = "; ".join(
+            f"{c.name_en} ({'active' if c.status == 'active' else 'demo stub'})"
+            for c in ref.channels)
+        current = ref.channel(proposed.get("channel"))
+        selected = f" Current selection: {current.name_en}." if current else ""
+        return "Channel options: " + choices + "." + selected
+    if "product" in text:
+        ref = load_reference_data()
+        return "Available active products: " + "; ".join(p.name_en for p in ref.active_products()) + "."
+    return None
+
+
+_CONFIRM_FIELD_TERMS = {
+    "channel": ("channel",), "customer": ("customer", "company", "client", "partner"),
+    "product": ("product",), "asset": ("asset", "vehicle", "car", "model"),
+    "term": ("term", "duration", "months"), "mileage": ("mileage", "km"),
+    "quantity": ("quantity", "fleet", "cars"),
+    "special_payment": ("special payment", "deposit", "down payment"),
+    "maintenance": ("maintenance",), "tyres": ("tyres", "tires"),
+    "insurance": ("insurance",),
+}
+
+
+def _mentioned_confirmation_fields(message: str) -> list[str]:
+    text = (message or "").lower()
+    return [field for field, terms in _CONFIRM_FIELD_TERMS.items()
+            if any(term in text for term in terms)]
+
+
+def _confirmation_scope(message: str) -> tuple[bool, list[str], bool]:
+    """Return (confirm_all, explicitly_named_fields, needs_clarification).
+
+    A conversational confirmation never guesses its target from the current wizard position. If no
+    field is named, the agent must ask which field the user means.
+    """
+    text = (message or "").lower().replace("’", "'")
+    explicit_all = any(phrase in text for phrase in (
+        "confirm all", "confirm everything", "approve all", "all fields", "everything is correct",
+        "everything looks good", "looks good, confirm all"))
+    if explicit_all:
+        return True, [], False
+    named = _mentioned_confirmation_fields(text)
+    bare_affirmation = text.strip(" .,!?") in {"yes", "y", "yep", "yeah", "ok", "okay", "sure"}
+    has_confirmation_verb = any(word in text for word in (
+        "confirm", "confirming", "confirmed", "confirmation"))
+    is_confirmation = (bare_affirmation or has_confirmation_verb
+                       or (bool(named) and any(word in text for word in ("correct", "agree", "agreed"))))
+    if not is_confirmation:
+        return False, [], False
+    if named:
+        return False, named, False
+    return False, [], True
+
+
+def _recommend_default_vehicle(proposed: dict) -> tuple[dict, str | None]:
+    """Propose the lowest listed-price vehicle when a fleet request omits its asset."""
+    if proposed.get("vehicle_key") or not proposed.get("quantity"):
+        return proposed, None
+    if proposed.get("make") or proposed.get("model") or proposed.get("filters"):
+        return proposed, None
+    rows = list_vehicles()
+    if not rows:
+        return proposed, None
+    vehicle = min(rows, key=lambda row: Decimal(str(row.get("list_price_net") or "Infinity")))
+    proposed["vehicle_key"] = vehicle["key"]
+    proposed["make"] = vehicle["make"]
+    proposed["model"] = vehicle["commercial_name"]
+    proposed["vehicle_recommended"] = True
+    message = (
+        f"Asset recommendation: {vehicle['label']} at €{Decimal(str(vehicle['list_price_net'])):,.0f} "
+        "net list price, the lowest-priced option in the seeded demo catalogue. This is a provisional "
+        "starting point, not a lease quote or a confirmed budget fit."
+    )
+    return proposed, message
+
+
+def _recommend_default_customer(proposed: dict) -> tuple[dict, str | None]:
+    """Propose a mock customer profile sized to the preliminary fleet exposure, if possible."""
+    if proposed.get("register_number") or proposed.get("company_hint"):
+        return proposed, None
+    quantity = int(proposed.get("quantity") or 0)
+    vehicle = next((v for v in list_vehicles() if v["key"] == proposed.get("vehicle_key")), None)
+    rough_exposure = (Decimal(str(vehicle.get("list_price_net"))) * quantity
+                      if vehicle and quantity > 0 else None)
+    customer = recommend_default_customer(rough_exposure)
+    if not customer:
+        if rough_exposure is not None:
+            return proposed, (
+                f"I couldn't find a verified, sanctions-clear green demo profile with a recommended "
+                f"credit limit covering the preliminary fleet exposure of €{rough_exposure:,.0f}. "
+                "Please select the actual customer from the directory; I won't guess their identity."
+            )
+        return proposed, None
+    proposed["register_number"] = customer["register_number"]
+    proposed["customer_recommended"] = True
+    if rough_exposure is not None:
+        return proposed, (
+            f"Based on the provisional asset and fleet size, estimated acquisition exposure is "
+            f"€{rough_exposure:,.0f} ({quantity} × €{Decimal(str(vehicle['list_price_net'])):,.0f} net). "
+            f"Of the seeded demo profiles, {customer['legal_name']} ({customer['register_number']}) "
+            f"is the green, KYC-complete, sanctions-clear profile with a recommended limit covering "
+            f"that estimate (€{customer['recommended_limit_eur']:,.0f}). This is mock risk data, "
+            "not verification of your customer's identity; confirm it is the intended customer or "
+            "give me the correct name."
+        )
+    return proposed, (
+        f"You didn't specify a customer. The demo directory's configured sample is "
+        f"{customer['legal_name']} ({customer['register_number']}). I've proposed it for this "
+        "offer; this is mock data, not verification of customer identity. Please confirm it or tell me another customer."
+    )
+
+
+def _initial_agent_message(proposed: dict, customer_note: str | None,
+                           asset_note: str | None) -> str:
+    """Give the user a concise, evidence-based recap of initial proposals and remaining inputs."""
+    facts = []
+    if proposed.get("channel"):
+        facts.append(f"channel {str(proposed['channel']).replace('_', ' ').title()}")
+    if proposed.get("leasing_product"):
+        facts.append(f"product {str(proposed['leasing_product']).replace('_', ' ').title()}")
+    quantity = proposed.get("quantity")
+    term = proposed.get("term_months")
+    if quantity:
+        facts.append(f"{quantity} vehicles")
+    if proposed.get("register_number") and not customer_note:
+        facts.append(f"customer {customer_label(proposed['register_number']) or proposed['register_number']}")
+    if proposed.get("vehicle_key") and not asset_note:
+        facts.append(f"asset {vehicle_label(proposed['vehicle_key']) or proposed['vehicle_key']}")
+    if term:
+        facts.append(f"{term}-month term")
+    mileage = proposed.get("annual_mileage_km")
+    if mileage:
+        facts.append(f"{int(mileage):,} km/year")
+    budgets = [c for c in (proposed.get("constraints") or [])
+               if (c.get("kind") or "").lower() in ("budget", "monthly_cap")]
+    if budgets:
+        budget = budgets[-1]
+        basis = budget.get("basis") or "basis not specified"
+        currency = budget.get("currency") or "EUR"
+        symbol = {"EUR": "€", "€": "€", "USD": "$", "$": "$", "GBP": "£", "£": "£"}.get(
+            currency.upper(), currency)
+        try:
+            amount = f"{Decimal(str(budget.get('value'))):,.0f}"
+        except (InvalidOperation, ValueError, TypeError):
+            amount = str(budget.get("value"))
+        basis_label = {"annual": "per year", "monthly": "per month", "per_vehicle": "per vehicle"}.get(
+            basis, basis)
+        facts.append(f"{symbol}{amount} {basis_label} budget")
+    intro = "Offer setup: " + ("; ".join(facts) if facts else "I’ve read your request") + "."
+    recommendations = " ".join(note for note in (customer_note, asset_note) if note)
+    mileage_note = (" I still need annual mileage to price the fleet against your budget."
+                    if not proposed.get("annual_mileage_km") else "")
+    footer = (" The vehicle figure is catalogue list price, not an engine-priced lease quote."
+              + mileage_note + " Please confirm or change the proposals; after the required fields "
+              "are confirmed, I'll recap them and ask before calculating.")
+    return f"{intro} {recommendations}{footer}" if recommendations else f"{intro}{footer}"
 
 
 def _apply_turn(proposed: dict, reply: dict) -> dict:
@@ -192,6 +395,8 @@ def _apply_turn(proposed: dict, reply: dict) -> dict:
     for k, v in (reply.get("overrides") or {}).items():
         if v not in (None, ""):
             proposed[k] = v
+    if any(k in (reply.get("overrides") or {}) for k in ("vehicle_key", "make", "model")):
+        proposed["vehicle_recommended"] = False
     return _resolve(proposed)
 
 
@@ -253,12 +458,12 @@ def understand_node(state) -> dict:
     transcript = ac.get("messages", [])
     if text:
         transcript.append({"role": "user", "content": text})
-        proposed = _merge(proposed, understand(text))
+        proposed = _merge(proposed, understand(text), source_text=text)
     proposed = _resolve(proposed)
+    proposed, asset_note = _recommend_default_vehicle(proposed)
+    proposed, customer_note = _recommend_default_customer(proposed)
     transcript.append({"role": "assistant",
-                       "content": "Got it — I've filled in what I could. Confirm the fields, or just tell me "
-                                  "any change here in the chat (e.g. “48 months”, “change the customer to …”, "
-                                  "or “confirm all”)."})
+                       "content": _initial_agent_message(proposed, customer_note, asset_note)})
     ac["messages"] = transcript
     ac["proposed"] = proposed
     offer.agent_context = ac
@@ -268,19 +473,25 @@ def understand_node(state) -> dict:
 
 
 # --- single conversational intake turn (docs/16: state-driven, chat-first) --- #
-_AFFIRM = {"yes", "y", "yep", "yeah", "ok", "okay", "confirm", "confirmed", "confirm all",
-           "looks good", "sounds good", "correct", "sure", "do it", "agreed"}
-_PROCEED = {"proceed", "generate", "go ahead", "go", "continue", "price it", "next", "done"}
-
-
-def _detect_action(msg: str) -> str | None:
-    """Lightweight affirmation/intent detection so the chat can confirm/proceed even without an LLM."""
-    t = (msg or "").strip().lower().rstrip(".!")
-    if t in _PROCEED or any(t.startswith(p + " ") for p in _PROCEED):
-        return "proceed"
-    if t in _AFFIRM or t.startswith("confirm"):
-        return "confirm"
-    return None
+def _explicit_pricing_confirmation(message: str) -> bool:
+    """Require a distinct user turn to start calculation after intake is complete."""
+    text = re.sub(r"[^a-z0-9]+", " ", (message or "").lower()).strip()
+    exact = {
+        "price it", "calculate", "calculate it", "calculate pricing", "calculate scenarios",
+        "start calculating", "start calculation", "start pricing", "run pricing",
+        "yes calculate", "yes calculate it", "yes calculate pricing", "yes calculate scenarios",
+        "yes start calculating", "yes start pricing", "go ahead and calculate",
+        "go ahead and price it", "please calculate", "please calculate it",
+        "please calculate pricing", "please start calculating", "confirm and price it",
+    }
+    if text in exact:
+        return True
+    return bool(re.fullmatch(
+        r"(?:(?:yes|please|okay|ok|go ahead|can you|could you|let s)\s+)*(?:start\s+)?"
+        r"(?:calculat(?:e|ing|ion)(?:\s+(?:the\s+)?(?:pricing|scenarios?))?|"
+        r"pric(?:e it|ing)|run pricing)(?:\s+now)?",
+        text,
+    ))
 
 
 def agent_turn_node(state) -> dict:
@@ -313,57 +524,120 @@ def agent_turn_node(state) -> dict:
     for k, v in (reply.get("overrides") or {}).items():
         if v not in (None, ""):
             proposed[k] = v
+    if any(k in (reply.get("overrides") or {}) for k in ("company_hint", "register_number")):
+        proposed["customer_recommended"] = False
     user_fields |= F.fields_for_keys((reply.get("overrides") or {}).keys())
     confirm_all = bool(reply.get("confirm"))
     confirm_fields: list[str] = [reply["confirm_field"]] if reply.get("confirm_field") else []
     proceed = bool(reply.get("proceed"))
     agent_reply: str | None = None
+    standalone_reply = False
 
     # free-text chat turn — the agent interprets intent (set / confirm / proceed / answer questions)
     msg = reply.get("message")
     if msg:
         ac.setdefault("messages", []).append({"role": "user", "content": msg})
-        plan = plan_turn(msg, F.summary(fs, proposed), F.options_summary())
+        scoped_all, scoped_fields, ambiguous_confirmation = _confirmation_scope(msg)
+        awaiting_target = bool(ac.get("awaiting_confirmation_field"))
+        clarification_fields = _mentioned_confirmation_fields(msg) if awaiting_target else []
+        if awaiting_target:
+            if clarification_fields:
+                ac.pop("awaiting_confirmation_field", None)
+                confirm_fields += clarification_fields
+                missing_values = [f for f in clarification_fields if not F._has(f, proposed)]
+                if missing_values:
+                    labels = ", ".join(F.LABELS[f] for f in missing_values)
+                    catalogue_answer = (f"I can't confirm {labels} yet because no usable value is set. "
+                                        "Please provide or select that value.")
+                else:
+                    labels = ", ".join(F.LABELS[f] for f in clarification_fields)
+                    catalogue_answer = f"Understood. I'll confirm {labels} only."
+            else:
+                catalogue_answer = ("Please name the field you want me to confirm, such as Customer, "
+                                    "Product, Vehicle, or Term. I haven't changed any fields.")
+            standalone_reply = True
+        elif ambiguous_confirmation:
+            ac["awaiting_confirmation_field"] = True
+            catalogue_answer = ("I’m not sure which field you mean. Please name the field you want "
+                                "me to confirm, such as Customer, Product, Vehicle, or Term.")
+            standalone_reply = True
+        else:
+            catalogue_answer = _catalogue_answer(msg, proposed)
+        pricing_confirmation = _explicit_pricing_confirmation(msg)
+        plan = None if catalogue_answer or pricing_confirmation else plan_turn(
+            msg, F.summary(fs, proposed), F.options_summary())
         if plan is not None:
             for k, v in (plan.set or {}).items():
                 if k in _TURN_SET_KEYS and v not in (None, ""):
                     proposed[k] = v
             if "make" in plan.set or "model" in plan.set:
                 proposed["vehicle_key"] = None      # re-resolve the asset from the new make/model
+                proposed["vehicle_recommended"] = False
+            elif "vehicle_key" in plan.set:
+                proposed["vehicle_recommended"] = False
             if "company_hint" in plan.set:
                 proposed["register_number"] = None  # re-resolve the customer from the new name
+                proposed["customer_recommended"] = False
             user_fields |= F.fields_for_keys((plan.set or {}).keys())
-            confirm_fields += [f for f in (plan.confirm or []) if f in F.LABELS]
-            confirm_all = confirm_all or bool(plan.confirm_all)
-            proceed = proceed or bool(plan.proceed)
+            explicit_field_confirm = bool(scoped_all or scoped_fields)
+            confirm_fields += ([f for f in (plan.confirm or []) if f in F.LABELS]
+                               if not explicit_field_confirm else scoped_fields)
+            confirm_all = confirm_all or scoped_all
+            # A planner's generic `proceed` classification is not consent to price. The user
+            # must make a clear pricing request in this separate turn.
+            proceed = proceed or pricing_confirmation
             agent_reply = (plan.reply or "").strip() or None
         else:                                       # no LLM: deterministic affirmation only
-            intent = understand(msg)
-            if intent is not None:
-                proposed = _merge(proposed, intent)
-            act = _detect_action(msg)
-            if act == "confirm":
-                confirm_all = True
-            elif act == "proceed":
-                proceed = True
+            if catalogue_answer:
+                agent_reply = catalogue_answer
+            else:
+                if scoped_all or scoped_fields:
+                    confirm_all = confirm_all or scoped_all
+                    confirm_fields += scoped_fields
+                elif not pricing_confirmation:
+                    intent = understand(msg)
+                    if intent is not None:
+                        proposed = _merge(proposed, intent, source_text=msg)
+                if not scoped_all and not scoped_fields and pricing_confirmation:
+                    proceed = True
 
     # derive product hierarchy + re-resolve keys, then fold into the status map
     proposed = F.derive_product(proposed, before)
     proposed = _resolve(proposed)
     user_fields |= F.changed_fields(before, proposed)          # any value the human's turn changed
+    if proposed.get("company_hint") != before.get("company_hint"):
+        # A chat assignment updates the customer proposal, then the user can explicitly confirm it
+        # in the next turn. Structured customer selection remains an explicit user confirmation.
+        user_fields.discard("customer")
     fs, ripple = F.apply(fs, before, proposed, user_fields=user_fields,
                          confirm=confirm_all, confirm_field=None)
     for f in confirm_fields:                                    # per-field confirmations (chat or card)
-        if f in fs:
+        if f in fs and F._has(f, proposed):
             fs[f]["status"] = "confirmed"
 
-    # if the human asked to proceed, treat remaining agent-proposals as accepted
-    if proceed:
-        for f in fs:
-            if fs[f].get("status") == "proposed":
-                fs[f]["status"] = "confirmed"
+    # Completing the last field is not consent to start pricing. Only an explicit pricing
+    # confirmation on this turn may hand off to the deterministic calculation graph.
+    all_confirmed = F.is_ready(fs)
+    start_pricing = all_confirmed and proceed
 
-    if agent_reply:
+    if agent_reply and standalone_reply:
+        line = agent_reply
+    elif start_pricing:
+        line = "All required fields are confirmed. I’ll calculate the pricing scenario now."
+    elif all_confirmed:
+        recap_fields = ("channel", "customer", "product", "asset", "term", "mileage", "quantity",
+                        "special_payment", "maintenance", "tyres", "insurance")
+        recap = "; ".join(
+            f"{F.LABELS[field]}: {F.display(field, proposed) or 'not provided'}"
+            for field in recap_fields)
+        budgets = [c for c in (proposed.get("constraints") or [])
+                   if (c.get("kind") or "").lower() in ("budget", "monthly_cap")]
+        if budgets:
+            budget = budgets[-1]
+            recap += f"; Budget: {budget.get('currency') or 'EUR'} {budget.get('value')} ({budget.get('basis') or 'basis not specified'})"
+        line = ("Everything is confirmed: " + recap
+                + ". Should I start the pricing calculation? Reply ‘yes, calculate’ or ‘price it’.")
+    elif agent_reply:
         nxt = F.next_prompt(fs, proposed)
         line = agent_reply if ("price it" in agent_reply.lower() or nxt in agent_reply) \
             else agent_reply.rstrip(". ") + ". " + nxt
@@ -372,11 +646,11 @@ def agent_turn_node(state) -> dict:
     if line:
         ac.setdefault("messages", []).append({"role": "assistant", "content": line})
 
-    ready = F.is_ready(fs)
+    ready = start_pricing
     ac["proposed"] = proposed
     ac["field_state"] = fs
     offer.agent_context = ac
-    offer.workflow_status = WorkflowStatus.CONTEXT_COMPLETE if ready else WorkflowStatus.UNDERSTANDING
+    offer.workflow_status = WorkflowStatus.CONTEXT_COMPLETE if start_pricing else WorkflowStatus.UNDERSTANDING
     _persist(offer, "AGENT_TURN")
     return {"offer": _dump(offer), "intake_ready": ready, "pending": None}
 
@@ -609,6 +883,22 @@ def _correction_message(offer: Offer) -> str:
         return "That annual mileage is out of policy (max 40,000 km). Give me a lower figure."
     if any(c in codes for c in ("SPECIAL_PAYMENT_TOO_HIGH", "PRODUCT_INELIGIBLE")):
         return "The special payment is too high (over 30% of the price). Lower it and I'll re-price."
+    if (offer.scoring and offer.scoring.value.band is RiskBand.RED
+            and offer.scoring.value.red_kind and offer.scoring.value.red_kind.value == "COMPLIANCE"):
+        hard_blocks = set(offer.scoring.value.hard_blocks or [])
+        if "SANCTIONS_MATCH" in hard_blocks:
+            message = ("The selected customer matched sanctions screening in the demo data, so this offer is "
+                       "blocked for compliance (risk score 0). Changing the vehicle or lease terms will not "
+                       "clear a customer-level match; confirm the intended customer and follow compliance review.")
+            manual = next((e for e in offer.exceptions if e.code == "SCORING_MANUAL_REVIEW"), None)
+            reasons = (manual.detail or {}).get("reasons", []) if manual else []
+            if reasons:
+                message += " Separately, these figures require manual review: " + "; ".join(reasons) + "."
+            return message
+        if "KYC_FAILED" in hard_blocks:
+            return "The selected customer failed KYC checks, so this offer is blocked for compliance. Resolve KYC before starting a new offer."
+        if "COMPANY_INSOLVENT" in hard_blocks:
+            return "The selected customer is marked insolvent in the risk data, so this offer is blocked for compliance."
     if offer.scoring and offer.scoring.value.band is RiskBand.RED:
         return ("This is Red on affordability/exposure. I can try a cheaper vehicle, a shorter term, "
                 "a lower mileage, or a higher special payment — tell me which and I'll re-price.")
@@ -617,7 +907,7 @@ def _correction_message(offer: Offer) -> str:
 
 def explain_pricing_node(state) -> dict:
     offer = _load(state)
-    if offer.calculation is None and not _compliance_blocked(offer):
+    if offer.calculation is None:
         ac = offer.agent_context
         ac.setdefault("messages", []).append({"role": "assistant", "content": _correction_message(offer)})
         offer.agent_context = ac
@@ -627,7 +917,7 @@ def explain_pricing_node(state) -> dict:
 
 
 def _scenario_summary(offer: Offer) -> str | None:
-    """A quick, human summary of the priced options for the chat (a glanceable recap)."""
+    """A quick, human summary of the priced scenario(s) for the chat."""
     scns = [s for s in (offer.scenarios or []) if s.calculation]
     if not scns:
         return None
@@ -635,9 +925,11 @@ def _scenario_summary(offer: Offer) -> str | None:
     lowest = min(scns, key=lambda s: s.calculation.value.monthly_gross_eur)
     parts = [f"{s.label} €{s.calculation.value.monthly_gross_eur}/mo"
              + (" (lowest)" if s.id == lowest.id else "") for s in scns]
-    return (f"Priced {len(scns)} option{'s' if len(scns) != 1 else ''} · band {band}: "
-            + " · ".join(parts)
-            + ". Pick one on the left, tell me which, or say “generate”.")
+    if len(scns) == 1:
+        return (f"Calculated the requested {scns[0].term_months}-month terms · band {band}: "
+                + parts[0] + ". Review the result on the left, then choose whether to generate the offer.")
+    return (f"Priced {len(scns)} options · band {band}: " + " · ".join(parts)
+            + ". These options are shown on the left for review.")
 
 
 def explain_scenarios_node(state) -> dict:

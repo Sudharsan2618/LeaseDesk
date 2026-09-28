@@ -1,7 +1,7 @@
 "use client";
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { getOffer } from "@/lib/api";
+import { getOffer, getVehicles } from "@/lib/api";
 import { useOfferStream } from "@/lib/useStream";
 import type { Snapshot } from "@/lib/types";
 import { eur, humanStatus } from "@/lib/format";
@@ -34,6 +34,10 @@ export default function Workspace({ params }: { params: Promise<{ id: string }> 
   const priced = !!offer?.calc;
   const hasBudget = !!(offer?.proposed?.constraints ?? []).find(
     (c) => c.kind === "budget" || c.kind === "monthly_cap");
+  const selectedScenario = offer
+    ? offer.scenarios.find((s) => s.id === offer.selected_scenario_id)
+    : undefined;
+  const selectedOverBudget = selectedScenario?.fits_budget === false;
 
   const fields = intakeInt?.field_state ?? snap?.field_state ?? [];
   const pendingFields = intakeInt?.pending ?? [];
@@ -64,6 +68,21 @@ export default function Workspace({ params }: { params: Promise<{ id: string }> 
   }
   async function generate() { const s = await run(`/offers/${id}/generate/stream`, {}); if (s) setSnap(s); }
   async function adjust() { const s = await run(`/offers/${id}/adjust/stream`, {}); if (s) setSnap(s); }
+  async function chooseBudgetVehicle(vehicleKey: string) {
+    try {
+      const vehicle = (await getVehicles()).find((v) => v.key === vehicleKey);
+      if (!vehicle) return;
+      const opened = await run(`/offers/${id}/adjust/stream`, {});
+      if (!opened) return;
+      setSnap(opened);
+      const updated = await run(`/offers/${id}/intake/stream`, {
+        overrides: { vehicle_key: vehicle.key, make: vehicle.make, model: vehicle.commercial_name },
+      });
+      if (updated) setSnap(updated);
+    } catch (e) {
+      setErr(String(e));
+    }
+  }
   async function reviewDecide(decision: "confirm" | "return") {
     const s = await run(`/offers/${id}/review/stream`, { decision }); if (s) setSnap(s);
   }
@@ -196,13 +215,14 @@ export default function Workspace({ params }: { params: Promise<{ id: string }> 
                     choices. Pick one, adjust with the agent, or generate. Nothing is locked.</p>
                   <ScenarioCards scenarios={offer.scenarios} onSelect={selectScenario}
                     selectedLabel={offer.selected_scenario_label} busy={running} />
+                  {selectedOverBudget && <div className="banner bad mini">This scenario exceeds the stated budget. Choose a fitting option before generating.</div>}
                   <div className="flex flex-wrap items-center gap-3">
-                    <button className="btn go" onClick={generate} disabled={running || !offer.selected_scenario_id}>
+                    <button className="btn go" onClick={generate} disabled={running || !offer.selected_scenario_id || selectedOverBudget}>
                       Generate offer</button>
                     <button className="btn" onClick={adjust} disabled={running}>Adjust with agent</button>
                   </div>
                 </div></div>
-              <BudgetFitPanel offerId={id} hasBudget={hasBudget} />
+              <BudgetFitPanel offerId={id} hasBudget={hasBudget} onChoose={chooseBudgetVehicle} />
               {offer.calc && <CalcBreakdownPanel calc={offer.calc} />}
             </>
           )}

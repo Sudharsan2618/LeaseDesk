@@ -47,7 +47,7 @@ def run_pipeline_node(state: OfferState) -> dict:
 
 
 def scenarios_node(state: OfferState) -> dict:
-    """Generate 2-3 priced alternatives (Phase 3) + budget-fit tagging when a budget is set (Phase 6)."""
+    """Price the requested terms as one scenario + budget-fit tagging when a budget is set."""
     from app.engine.budget import annotate_scenarios
     offer = _load(state)
     policy = load_policy(offer.policy_version)
@@ -81,6 +81,15 @@ def workspace_gate_node(state: OfferState) -> dict:
     a = ((action.get("action") if isinstance(action, dict) else str(action)) or "").lower()
 
     if a == "generate" and offer.selected_scenario_id is not None:
+        selected = _selected_scenario(offer)
+        if selected is not None and selected.fits_budget is False:
+            offer.agent_context.setdefault("messages", []).append({
+                "role": "assistant",
+                "content": "That scenario exceeds the stated budget, so I can't generate it. "
+                           "Choose a budget-fitting vehicle or revise the budget.",
+            })
+            _persist(offer, "GENERATION_BLOCKED_BUDGET")
+            return {"offer": _dump(offer), "gate_action": "select", "finalize": False}
         # generation now goes THROUGH the human-review gate (BR-15); finalize is set there, not here.
         # Mark PENDING_HUMAN_REVIEW here (the gate returns normally, so this commits to graph state):
         # human_review_node sets it too, but that assignment runs before its interrupt() and so never

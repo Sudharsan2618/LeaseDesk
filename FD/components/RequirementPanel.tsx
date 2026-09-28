@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import type { FieldRow, ReferenceData } from "@/lib/types";
-import { getReference } from "@/lib/api";
+import type { CatalogueVehicle, FieldRow, ReferenceData } from "@/lib/types";
+import { getReference, getVehicles } from "@/lib/api";
 
 /** State-driven intake (docs/16): the live field-state view. Each field shows its status; pending
  *  fields can be confirmed or edited inline; anything can also be changed by talking to the agent on
@@ -13,7 +13,7 @@ const OVERRIDE_KEY: Record<string, string> = {
 };
 const NUMERIC = new Set(["term", "mileage", "quantity", "special_payment"]);
 const TOGGLE = new Set(["maintenance", "tyres", "insurance"]);
-const CHAT_ONLY = new Set(["customer", "asset"]);
+const CHAT_ONLY = new Set(["customer"]);
 
 const STATUS: Record<string, { cls: string; label: string }> = {
   confirmed: { cls: "g", label: "confirmed" },
@@ -32,9 +32,13 @@ export function RequirementPanel({
   onEdit: (overrides: Record<string, unknown>) => void;
 }) {
   const [ref, setRef] = useState<ReferenceData | null>(null);
+  const [vehicles, setVehicles] = useState<CatalogueVehicle[]>([]);
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState<string>("");
-  useEffect(() => { getReference().then(setRef).catch(() => {}); }, []);
+  useEffect(() => {
+    getReference().then(setRef).catch(() => {});
+    getVehicles().then(setVehicles).catch(() => {});
+  }, []);
 
   const required = fields.filter((f) => f.required);
   const done = required.filter((f) => f.status === "confirmed").length;
@@ -74,6 +78,18 @@ export function RequirementPanel({
                     : TOGGLE.has(f.field) ? (f.value ? "yes" : "no") : String(f.value)}
                 </span>
               )}
+              {f.field === "asset" && (
+                <select className="inp freq-inp" value={f.option_key ?? ""} disabled={busy || vehicles.length === 0}
+                  aria-label="Choose vehicle" onChange={(e) => {
+                    const selected = vehicles.find((v) => v.key === e.target.value);
+                    if (selected) onEdit({ vehicle_key: selected.key, make: selected.make, model: selected.commercial_name });
+                  }}>
+                  <option value="">Choose a vehicle…</option>
+                  {vehicles.map((v) => <option key={v.key} value={v.key}>
+                    {v.label} · €{Number(v.list_price_net).toLocaleString()} net
+                  </option>)}
+                </select>
+              )}
               {isEditing && NUMERIC.has(f.field) && (
                 <input autoFocus className="inp freq-inp num" type="number" value={draft}
                   onChange={(e) => setDraft(e.target.value)}
@@ -94,7 +110,7 @@ export function RequirementPanel({
                     {f.value ? "Remove" : "Add"}</button>
                 ) : CHAT_ONLY.has(f.field) ? (
                   <span className="mini faint">edit in chat</span>
-                ) : !isEditing ? (
+                ) : f.field === "asset" ? null : !isEditing ? (
                   <button className="freq-edit" disabled={busy} onClick={() => startEdit(f)}>edit</button>
                 ) : null}
                 {pending && !TOGGLE.has(f.field) && (

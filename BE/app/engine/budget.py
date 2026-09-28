@@ -7,6 +7,7 @@ compares it to the budget. `AI assists · Rules decide.`
 
 Basis handling (the ambiguity the agent flags at intake, resolved before we get here):
   - monthly       -> fleet monthly gross         (total_monthly_gross_eur)
+  - annual        -> fleet annual gross          (total_monthly_gross_eur × 12)
   - per_vehicle   -> per-vehicle monthly gross    (monthly_gross_eur)
   - total/unknown -> whole-contract cost          (total_monthly_gross_eur × term_months)
   - acquisition   -> fleet capex                  (acquisition_price × quantity)
@@ -30,6 +31,21 @@ def extract_budget(offer: Offer) -> Optional[dict]:
         kind = (c.get("kind") or "").lower()
         if kind in ("budget", "monthly_cap") and c.get("value") not in (None, ""):
             basis = (c.get("basis") or ("monthly" if kind == "monthly_cap" else "unknown")).lower()
+            if basis == "unknown":
+                transcript = (offer.agent_context or {}).get("messages") or []
+                request_text = " ".join(m.get("content", "") for m in transcript
+                                         if m.get("role") == "user").lower()
+                if any(p in request_text for p in (
+                    "per year", "a year", "annual", "annually", "yearly", "/year")):
+                    basis = "annual"
+                elif any(p in request_text for p in (
+                    "per month", "a month", "monthly", "/month")):
+                    basis = "monthly"
+                elif "per vehicle" in request_text or "per car" in request_text:
+                    basis = "per_vehicle"
+                elif any(p in request_text for p in (
+                    "whole contract", "total contract", "over the contract")):
+                    basis = "total"
             try:
                 value = Decimal(str(c["value"]))
             except (ValueError, ArithmeticError):
@@ -43,6 +59,8 @@ def fit_metric(calc: CalculationResult, term_months: int, basis: str,
     """The figure to compare against the budget, per basis. Reads engine output only."""
     if basis == "monthly":
         return calc.total_monthly_gross_eur
+    if basis == "annual":
+        return calc.total_monthly_gross_eur * Decimal("12")
     if basis == "per_vehicle":
         return calc.monthly_gross_eur
     if basis == "acquisition" and acquisition_fleet_eur is not None:

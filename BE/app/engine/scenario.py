@@ -1,9 +1,8 @@
-"""Scenario engine (docs/03 Phase 3): from one request, build & price 2-3 valid alternatives.
+"""Scenario engine: price the exact customer-requested commercial terms.
 
-Each scenario is a variation of the CommercialRequirement (default: vary the term). Every scenario
-re-runs residual -> funding -> margin -> calculate for its own parameters. B2B scoring does not
-depend on term/mileage/rental, so when only those vary the band is constant and the offer's
-existing ScoringResult is reused; if special payment varies (exposure changes) it is rescored.
+Every scenario re-runs residual -> funding -> margin -> calculate. The requested term, mileage,
+quantity, payment and service bundle are held fixed: alternative terms or add-ons are not silently
+introduced as if they were part of the request.
 
 Assumes run_pipeline has already assembled the customer context (credit/kyc/sanctions) and produced
 a non-RED band. RED offers are blocked and get no scenarios.
@@ -84,16 +83,7 @@ def generate_scenarios(
     term_options: Optional[list[int]] = None,
     max_scenarios: int = 4,
 ) -> list[Scenario]:
-    """Build a requirement-aware set of alternatives.
-
-    The customer's explicit choices are honoured: the vehicle, mileage, quantity and special payment
-    are fixed, and any service the customer already asked for stays on in every scenario (we never
-    strip an explicit option). Around that:
-      • term is varied *around the requested term* (nearest valid terms first) so the salesperson can
-        trade monthly rate against contract length;
-      • an "all-inclusive" variant is offered at the requested term when the customer left services
-        open (adds maintenance/tyres/insurance) — showing the with/without cost difference.
-    """
+    """Price one scenario using the request as stated; edits trigger a new price run."""
     policy = policy or load_policy(offer.policy_version)
 
     # only meaningful for a priced (GREEN/YELLOW) offer
@@ -109,31 +99,10 @@ def generate_scenarios(
     maint0 = bool(offer.commercial.service_maintenance.value)
     tyres0 = bool(offer.commercial.service_tyres.value)
     ins0 = bool(offer.commercial.insurance.value)
-    full_bundle = maint0 and tyres0 and ins0
-
-    # Terms to try, centred on the requested term (distance 0 first), from the policy's preferred set.
-    prefs = sorted(set((term_options or policy.term_preferred) or []) | {base_term})
-    term_order = sorted(prefs, key=lambda t: (abs(t - base_term), t))
-
-    # Reserve one slot for the all-inclusive upsell when the customer left services open.
-    n_terms = max_scenarios if full_bundle else max(1, max_scenarios - 1)
-
-    scenarios: list[Scenario] = []
-    for term in term_order:
-        if len(scenarios) >= n_terms:
-            break
-        s = _price_scenario(offer, policy, ref_rate, vat, term=term,
-                            maint=maint0, tyres=tyres0, insurance=ins0, label=f"{term} mo")
-        if s:
-            scenarios.append(s)
-
-    if not full_bundle and len(scenarios) < max_scenarios:
-        s = _price_scenario(offer, policy, ref_rate, vat, term=base_term,
-                            maint=True, tyres=True, insurance=True, label=f"{base_term} mo · all-inclusive")
-        if s and not any(sc.label == s.label for sc in scenarios):
-            scenarios.append(s)
-
-    offer.scenarios = scenarios[:max_scenarios]
+    scenario = _price_scenario(offer, policy, ref_rate, vat, term=base_term,
+                               maint=maint0, tyres=tyres0, insurance=ins0,
+                               label=f"{base_term} mo")
+    offer.scenarios = [scenario] if scenario else []
     # A fresh scenario set has new ids — a selection from a previous pass (e.g. before an Adjust) now
     # dangles and would violate fk_selected_scenario on persist. Drop it so the user re-selects.
     if offer.selected_scenario_id not in {s.id for s in offer.scenarios}:

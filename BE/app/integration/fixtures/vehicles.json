@@ -69,6 +69,123 @@
       "consumption_kwh_100km": 24.0,
       "colours": ["Carrara White", "Jet Black", "Volcano Grey", "Gentian Blue"],
       "list_price_net": "104600.00"
+    },
+    {
+      "key": "dacia-sandero-tce90",
+      "make": "Dacia", "commercial_name": "Sandero", "model_family": "Sandero", "variant": "TCe 90",
+      "type_approval_number": "DEMO-M1-00004", "hsn": "9991", "tsn": "DSR",
+      "vehicle_category": "M1", "body_type": "Hatchback", "fuel_type": "PETROL",
+      "transmission": "Manual", "engine_capacity_cc": 999, "engine_power_kw": 67,
+      "engine_power_hp": 91, "seats": 5, "wltp_co2_g_km": 120, "co2_class": "D",
+      "consumption_l_100km": 5.3, "colours": ["White", "Grey", "Blue"], "list_price_net": "15900.00"
+    },
+    {
+      "key": "renault-clio-tce90",
+      "make": "Renault", "commercial_name": "Clio", "model_family": "Clio", "variant": "TCe 90",
+      "type_approval_number": "DEMO-M1-00005", "hsn": "9992", "tsn": "RCL",
+      "vehicle_category": "M1", "body_type": "Hatchback", "fuel_type": "PETROL",
+      "transmission": "Manual", "engine_capacity_cc": 999, "engine_power_kw": 67,
+      "engine_power_hp": 91, "seats": 5, "wltp_co2_g_km": 118, "co2_class": "D",
+      "consumption_l_100km": 5.2, "colours": ["White", "Grey", "Red"], "list_price_net": "19700.00"
+    },
+    {
+      "key": "vw-golf-15etsi",
+      "make": "Volkswagen", "commercial_name": "Golf", "model_family": "Golf", "variant": "1.5 eTSI",
+      "type_approval_number": "DEMO-M1-00006", "hsn": "9993", "tsn": "VGO",
+      "vehicle_category": "M1", "body_type": "Hatchback", "fuel_type": "PETROL_MHEV",
+      "transmission": "Automatic", "engine_capacity_cc": 1498, "engine_power_kw": 96,
+      "engine_power_hp": 130, "seats": 5, "wltp_co2_g_km": 125, "co2_class": "D",
+      "consumption_l_100km": 5.6, "colours": ["White", "Black", "Blue"], "list_price_net": "28700.00"
+    },
+    {
+      "key": "skoda-octavia-15tsi",
+      "make": "Skoda", "commercial_name": "Octavia", "model_family": "Octavia", "variant": "1.5 TSI",
+      "type_approval_number": "DEMO-M1-00007", "hsn": "9994", "tsn": "SOK",
+      "vehicle_category": "M1", "body_type": "Estate", "fuel_type": "PETROL",
+      "transmission": "Automatic", "engine_capacity_cc": 1498, "engine_power_kw": 110,
+      "engine_power_hp": 150, "seats": 5, "wltp_co2_g_km": 129, "co2_class": "D",
+      "consumption_l_100km": 5.8, "colours": ["White", "Black", "Silver"], "list_price_net": "30100.00"
+    },
+    {
+      "key": "toyota-corolla-touring-hybrid",
+      "make": "Toyota", "commercial_name": "Corolla Touring Sports", "model_family": "Corolla", "variant": "1.8 Hybrid",
+      "type_approval_number": "DEMO-M1-00008", "hsn": "9995", "tsn": "TCT",
+      "vehicle_category": "M1", "body_type": "Estate", "fuel_type": "HYBRID",
+      "transmission": "Automatic e-CVT", "engine_capacity_cc": 1798, "engine_power_kw": 103,
+      "engine_power_hp": 140, "seats": 5, "wltp_co2_g_km": 102, "co2_class": "C",
+      "consumption_l_100km": 4.5, "colours": ["White", "Black", "Silver"], "list_price_net": "29600.00"
+    },
+    {
+      "key": "hyundai-kona-electric-48",
+      "make": "Hyundai", "commercial_name": "Kona Electric", "model_family": "Kona", "variant": "48 kWh",
+      "type_approval_number": "DEMO-M1-00009", "hsn": "9996", "tsn": "HKE",
+      "vehicle_category": "M1", "body_type": "SUV", "fuel_type": "ELECTRIC",
+      "transmission": "Automatic", "engine_capacity_cc": 0, "engine_power_kw": 115,
+      "engine_power_hp": 156, "seats": 5, "wltp_co2_g_km": 0, "co2_class": "A",
+      "consumption_kwh_100km": 14.6, "colours": ["White", "Black", "Green"], "list_price_net": "33600.00"
+    },
+    {
+      "key": "vw-id3-pro",
+      "make": "Volkswagen", "commercial_name": "ID.3", "model_family": "ID.3", "variant": "Pro",
+      "type_approval_number": "DEMO-M1-00010", "hsn": "9997", "tsn": "VID",
+      "vehicle_category": "M1", "body_type": "Hatchback", "fuel_type": "ELECTRIC",
+      "transmission": "Automatic", "engine_capacity_cc": 0, "engine_power_kw": 150,
+      "engine_power_hp": 204, "seats": 5, "wltp_co2_g_km": 0, "co2_class": "A",
+      "consumption_kwh_100km": 15.2, "colours": ["White", "Black", "Blue"], "list_price_net": "35900.00"
+    },
+    {
+      "key": "skoda-enyaq-85",
+      "make": "Skoda", "commercial_name": "Enyaq", "model_family": "Enyaq", "variant": "85",
+      "type_approval_number": "DEMO-M1-00011", "hsn": "9998", "tsn": "SEN",
+      "vehicle_category": "M1", "body_type": "SUV", "fuel_type": "ELECTRIC",
+      "transmission": "Automatic", "engine_capacity_cc": 0, "engine_power_kw": 210,
+      "engine_power_hp": 286, "seats": 5, "wltp_co2_g_km": 0, "co2_class": "A",
+      "consumption_kwh_100km": 16.2, "colours": ["White", "Black", "Blue"], "list_price_net": "42400.00"
+    },
+    {
+      "key": "toyota-rav4-hybrid",
+      "make": "Toyota", "commercial_name": "RAV4", "model_family": "RAV4", "variant": "2.5 Hybrid",
+      "type_approval_number": "DEMO-M1-00012", "hsn": "9999", "tsn": "TRV",
+      "vehicle_category": "M1", "body_type": "SUV", "fuel_type": "HYBRID",
+      "transmission": "Automatic e-CVT", "engine_capacity_cc": 2487, "engine_power_kw": 160,
+      "engine_power_hp": 218, "seats": 5, "wltp_co2_g_km": 130, "co2_class": "D",
+      "consumption_l_100km": 5.8, "colours": ["White", "Black", "Silver"], "list_price_net": "40900.00"
+    },
+    {
+      "key": "audi-a3-35tfsi",
+      "make": "Audi", "commercial_name": "A3 Sportback", "model_family": "A3", "variant": "35 TFSI",
+      "type_approval_number": "DEMO-M1-00013", "hsn": "9901", "tsn": "AA3",
+      "vehicle_category": "M1", "body_type": "Hatchback", "fuel_type": "PETROL",
+      "transmission": "Automatic", "engine_capacity_cc": 1498, "engine_power_kw": 110,
+      "engine_power_hp": 150, "seats": 5, "wltp_co2_g_km": 129, "co2_class": "D",
+      "consumption_l_100km": 5.8, "colours": ["White", "Black", "Grey"], "list_price_net": "32900.00"
+    },
+    {
+      "key": "mercedes-a200",
+      "make": "Mercedes-Benz", "commercial_name": "A-Class", "model_family": "A-Class", "variant": "A 200",
+      "type_approval_number": "DEMO-M1-00014", "hsn": "9902", "tsn": "MA2",
+      "vehicle_category": "M1", "body_type": "Hatchback", "fuel_type": "PETROL_MHEV",
+      "transmission": "Automatic", "engine_capacity_cc": 1332, "engine_power_kw": 120,
+      "engine_power_hp": 163, "seats": 5, "wltp_co2_g_km": 134, "co2_class": "D",
+      "consumption_l_100km": 5.9, "colours": ["White", "Black", "Grey"], "list_price_net": "34500.00"
+    },
+    {
+      "key": "tesla-model-3-rwd",
+      "make": "Tesla", "commercial_name": "Model 3", "model_family": "Model 3", "variant": "Rear-Wheel Drive",
+      "type_approval_number": "DEMO-M1-00015", "hsn": "9903", "tsn": "TM3",
+      "vehicle_category": "M1", "body_type": "Sedan", "fuel_type": "ELECTRIC",
+      "transmission": "Automatic", "engine_capacity_cc": 0, "engine_power_kw": 208,
+      "engine_power_hp": 283, "seats": 5, "wltp_co2_g_km": 0, "co2_class": "A",
+      "consumption_kwh_100km": 14.4, "colours": ["White", "Black", "Blue"], "list_price_net": "38900.00"
+    },
+    {
+      "key": "bmw-3series-320i",
+      "make": "BMW", "commercial_name": "3 Series", "model_family": "3 Series", "variant": "320i",
+      "type_approval_number": "DEMO-M1-00016", "hsn": "9904", "tsn": "B32",
+      "vehicle_category": "M1", "body_type": "Sedan", "fuel_type": "PETROL_MHEV",
+      "transmission": "Automatic", "engine_capacity_cc": 1998, "engine_power_kw": 135,
+      "engine_power_hp": 184, "seats": 5, "wltp_co2_g_km": 147, "co2_class": "E",
+      "consumption_l_100km": 6.4, "colours": ["White", "Black", "Blue"], "list_price_net": "43100.00"
     }
   ]
 }

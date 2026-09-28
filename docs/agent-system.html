@@ -1,0 +1,146 @@
+<title>Leasedesk Runtime Sequence</title>
+<style>
+  :root{ color-scheme:light;
+    --ground:#f4f6f9; --surface:#ffffff; --ink:#1e1f21; --muted:#5b6270; --faint:#8b909c;
+    --hair:#e6e8ec; --brand:#4573d2; --brand-tx:#2c4a88; --brand-soft:#eef1fe;
+    --sans:"Figtree",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+    --p1:#e6f1fb; --p1t:#0c447c; --p2:#faeeda; --p2t:#633806; --p3:#eaf3de; --p3t:#27500a; --p4:#efe7fb; --p4t:#3c3489; }
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){ color-scheme:dark;
+    --ground:#0e0f13; --surface:#171a20; --ink:#eceef2; --muted:#a2a8b4; --faint:#6b7280;
+    --hair:#2a2f38; --brand:#7ea2ec; --brand-tx:#a9c2f2; --brand-soft:#1a2740;
+    --p1:#10233a; --p1t:#9cc4ef; --p2:#2a2010; --p2t:#e6b463; --p3:#152510; --p3t:#a7cf7f; --p4:#1c1633; --p4t:#b7aef0; }}
+  :root[data-theme="dark"]{ color-scheme:dark;
+    --ground:#0e0f13; --surface:#171a20; --ink:#eceef2; --muted:#a2a8b4; --faint:#6b7280;
+    --hair:#2a2f38; --brand:#7ea2ec; --brand-tx:#a9c2f2; --brand-soft:#1a2740;
+    --p1:#10233a; --p1t:#9cc4ef; --p2:#2a2010; --p2t:#e6b463; --p3:#152510; --p3t:#a7cf7f; --p4:#1c1633; --p4t:#b7aef0; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);line-height:1.5}
+  .page{padding-block:24px;padding-inline:16px;max-width:1040px;margin-inline:auto}
+  h1{font-weight:600;font-size:22px;margin:0 0 4px;letter-spacing:-.01em}
+  .lede{margin:0;color:var(--muted);font-size:14px}
+  .motto{color:var(--brand-tx);font-weight:500;font-size:13px;margin:6px 0 14px}
+  .figure{background:var(--surface);border:1px solid var(--hair);border-radius:12px;padding:12px 8px;overflow-x:auto}
+  .figure svg{min-width:820px;display:block}
+  .ll{stroke:var(--hair);stroke-width:1.2;stroke-dasharray:2 5}
+  .actor{fill:var(--surface);stroke:var(--hair);stroke-width:1.2}
+  .actor.o{fill:var(--brand);stroke:var(--brand)}
+  .actor.u{fill:var(--brand-soft);stroke:var(--brand)}
+  .actorlbl{fill:var(--ink);font-size:13px;font-weight:600}
+  .actorlbl.ow{fill:#fff}
+  .msg{stroke:var(--muted);stroke-width:1.4;fill:none}
+  .msg.ret{stroke-dasharray:5 4;stroke:var(--faint)}
+  .lbl{fill:var(--ink);font-size:12px}
+  .band{opacity:.55}
+  .p1{fill:var(--p1)} .p2{fill:var(--p2)} .p3{fill:var(--p3)} .p4{fill:var(--p4)}
+  .phtitle{font-size:12px;font-weight:600}
+  .p1t{fill:var(--p1t)} .p2t{fill:var(--p2t)} .p3t{fill:var(--p3t)} .p4t{fill:var(--p4t)}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:14px;font-size:12px;color:var(--muted)}
+  .legend .i{display:inline-flex;align-items:center;gap:7px}
+  .legend .ln{width:26px;height:0;border-top:1.6px solid var(--muted)}
+  .legend .ln.d{border-top-style:dashed;border-color:var(--faint)}
+  .note{font-size:12px;color:var(--faint);margin-top:12px;line-height:1.6}
+  .note code{font-family:var(--mono);font-size:11px}
+</style>
+<div class="page">
+  <h1>Leasedesk — what actually happens (one offer, in order)</h1>
+  <p class="lede">A runtime sequence: each arrow is a real call between components, top to bottom.</p>
+  <p class="motto">AI assists · Rules decide · Humans govern.</p>
+  <div class="figure"><svg viewBox="0 0 960 1188" width="100%" role="img" xmlns="http://www.w3.org/2000/svg" font-family="var(--sans)">
+<title>Leasedesk runtime sequence</title><desc>Ordered messages between Salesperson, Web app, Orchestrator, LLM, Engine and Postgres for one offer.</desc>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M2 2 L8 5 L2 8" fill="none" stroke="context-stroke" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<rect class="band p1" x="20" y="112" width="920" height="270" rx="10"/>
+<text class="phtitle p1t" x="34" y="129">Phase 1 · Intake — the agent understands</text>
+<rect class="band p2" x="20" y="404" width="920" height="246" rx="10"/>
+<text class="phtitle p2t" x="34" y="421">Phase 2 · Confirm &amp; edit — loops, human-in-loop</text>
+<rect class="band p3" x="20" y="672" width="920" height="202" rx="10"/>
+<text class="phtitle p3t" x="34" y="689">Phase 3 · Pricing — the engine decides</text>
+<rect class="band p4" x="20" y="896" width="920" height="236" rx="10"/>
+<text class="phtitle p4t" x="34" y="913">Phase 4 · Decide &amp; generate — the human governs</text>
+<line class="ll" x1="82" y1="92" x2="82" y2="1140"/>
+<line class="ll" x1="250" y1="92" x2="250" y2="1140"/>
+<line class="ll" x1="430" y1="92" x2="430" y2="1140"/>
+<line class="ll" x1="600" y1="92" x2="600" y2="1140"/>
+<line class="ll" x1="740" y1="92" x2="740" y2="1140"/>
+<line class="ll" x1="880" y1="92" x2="880" y2="1140"/>
+<rect class="actor u" x="24" y="28" width="116" height="34" rx="8"/>
+<text class="actorlbl" x="82" y="50" text-anchor="middle">Salesperson</text>
+<rect class="actor u" x="24" y="1142" width="116" height="34" rx="8"/>
+<text class="actorlbl" x="82" y="1164" text-anchor="middle">Salesperson</text>
+<rect class="actor" x="192" y="28" width="116" height="34" rx="8"/>
+<text class="actorlbl" x="250" y="50" text-anchor="middle">Web app</text>
+<rect class="actor" x="192" y="1142" width="116" height="34" rx="8"/>
+<text class="actorlbl" x="250" y="1164" text-anchor="middle">Web app</text>
+<rect class="actor o" x="372" y="28" width="116" height="34" rx="8"/>
+<text class="actorlbl ow" x="430" y="50" text-anchor="middle">Orchestrator</text>
+<rect class="actor o" x="372" y="1142" width="116" height="34" rx="8"/>
+<text class="actorlbl ow" x="430" y="1164" text-anchor="middle">Orchestrator</text>
+<rect class="actor" x="542" y="28" width="116" height="34" rx="8"/>
+<text class="actorlbl" x="600" y="50" text-anchor="middle">LLM</text>
+<rect class="actor" x="542" y="1142" width="116" height="34" rx="8"/>
+<text class="actorlbl" x="600" y="1164" text-anchor="middle">LLM</text>
+<rect class="actor" x="682" y="28" width="116" height="34" rx="8"/>
+<text class="actorlbl" x="740" y="50" text-anchor="middle">Engine</text>
+<rect class="actor" x="682" y="1142" width="116" height="34" rx="8"/>
+<text class="actorlbl" x="740" y="1164" text-anchor="middle">Engine</text>
+<rect class="actor" x="822" y="28" width="116" height="34" rx="8"/>
+<text class="actorlbl" x="880" y="50" text-anchor="middle">Postgres</text>
+<rect class="actor" x="822" y="1142" width="116" height="34" rx="8"/>
+<text class="actorlbl" x="880" y="1164" text-anchor="middle">Postgres</text>
+<line class="msg" x1="82" y1="156" x2="250" y2="156" marker-end="url(#ah)"/>
+<text class="lbl" x="166" y="150" text-anchor="middle">types the request</text>
+<line class="msg" x1="250" y1="190" x2="430" y2="190" marker-end="url(#ah)"/>
+<text class="lbl" x="340" y="184" text-anchor="middle">POST /offers/nl (stream)</text>
+<line class="msg" x1="430" y1="224" x2="600" y2="224" marker-end="url(#ah)"/>
+<text class="lbl" x="515" y="218" text-anchor="middle">understand · extract intent</text>
+<line class="msg ret" x1="600" y1="258" x2="430" y2="258" marker-end="url(#ah)"/>
+<text class="lbl" x="515" y="252" text-anchor="middle">fields (customer, car, term…)</text>
+<line class="msg" x1="430" y1="292" x2="740" y2="292" marker-end="url(#ah)"/>
+<text class="lbl" x="585" y="286" text-anchor="middle">resolve names → keys</text>
+<line class="msg" x1="430" y1="326" x2="880" y2="326" marker-end="url(#ah)"/>
+<text class="lbl" x="655" y="320" text-anchor="middle">checkpoint · PAUSE</text>
+<line class="msg ret" x1="430" y1="360" x2="250" y2="360" marker-end="url(#ah)"/>
+<text class="lbl" x="340" y="354" text-anchor="middle">fields proposed · needs confirm</text>
+<line class="msg" x1="82" y1="448" x2="250" y2="448" marker-end="url(#ah)"/>
+<text class="lbl" x="166" y="442" text-anchor="middle">confirm / edit (chat or panel)</text>
+<line class="msg" x1="250" y1="482" x2="430" y2="482" marker-end="url(#ah)"/>
+<text class="lbl" x="340" y="476" text-anchor="middle">POST /intake · resume</text>
+<line class="msg" x1="430" y1="516" x2="600" y2="516" marker-end="url(#ah)"/>
+<text class="lbl" x="515" y="510" text-anchor="middle">plan_turn · interpret (free-text)</text>
+<line class="msg ret" x1="600" y1="550" x2="430" y2="550" marker-end="url(#ah)"/>
+<text class="lbl" x="515" y="544" text-anchor="middle">set / confirm / reply</text>
+<path class="msg" d="M430 584 h30 v16 h-30" marker-end="url(#ah)"/>
+<text class="lbl" x="468" y="595" text-anchor="start">update field_state · ripple</text>
+<line class="msg" x1="430" y1="628" x2="880" y2="628" marker-end="url(#ah)"/>
+<text class="lbl" x="655" y="622" text-anchor="middle">checkpoint · repeat until confirmed</text>
+<line class="msg" x1="430" y1="716" x2="740" y2="716" marker-end="url(#ah)"/>
+<text class="lbl" x="585" y="710" text-anchor="middle">assemble → score → price → scenarios</text>
+<line class="msg ret" x1="740" y1="750" x2="430" y2="750" marker-end="url(#ah)"/>
+<text class="lbl" x="585" y="744" text-anchor="middle">GREEN · rate 5.25% · 4 options</text>
+<line class="msg" x1="430" y1="784" x2="600" y2="784" marker-end="url(#ah)"/>
+<text class="lbl" x="515" y="778" text-anchor="middle">explain pricing &amp; scenarios</text>
+<line class="msg" x1="430" y1="818" x2="880" y2="818" marker-end="url(#ah)"/>
+<text class="lbl" x="655" y="812" text-anchor="middle">persist offer + scenarios + audit</text>
+<line class="msg ret" x1="430" y1="852" x2="250" y2="852" marker-end="url(#ah)"/>
+<text class="lbl" x="340" y="846" text-anchor="middle">scenarios ready · PAUSE</text>
+<line class="msg" x1="82" y1="940" x2="250" y2="940" marker-end="url(#ah)"/>
+<text class="lbl" x="166" y="934" text-anchor="middle">pick a scenario → Generate</text>
+<line class="msg" x1="250" y1="974" x2="430" y2="974" marker-end="url(#ah)"/>
+<text class="lbl" x="340" y="968" text-anchor="middle">resume(generate) · PAUSE review</text>
+<line class="msg" x1="82" y1="1008" x2="250" y2="1008" marker-end="url(#ah)"/>
+<text class="lbl" x="166" y="1002" text-anchor="middle">Confirm &amp; generate (mandatory)</text>
+<line class="msg" x1="430" y1="1042" x2="740" y2="1042" marker-end="url(#ah)"/>
+<text class="lbl" x="585" y="1036" text-anchor="middle">final_validation (READY?)</text>
+<line class="msg" x1="430" y1="1076" x2="880" y2="1076" marker-end="url(#ah)"/>
+<text class="lbl" x="655" y="1070" text-anchor="middle">freeze snapshot + audit · END</text>
+<line class="msg ret" x1="430" y1="1110" x2="250" y2="1110" marker-end="url(#ah)"/>
+<text class="lbl" x="340" y="1104" text-anchor="middle">Offer generated</text>
+</svg></div>
+  <div class="legend">
+    <span class="i"><span class="ln"></span> call</span>
+    <span class="i"><span class="ln d"></span> response</span>
+    <span class="i"><b>PAUSE</b> = LangGraph interrupt() — waits for the human, resumes on the next action</span>
+  </div>
+  <p class="note">One offer = one durable thread. Every step is checkpointed to Postgres, so the session resumes end to end.
+    A free-text turn calls the <code>LLM</code>; confirming, inline edits and “price it” are instant (no LLM).</p>
+</div>

@@ -78,6 +78,20 @@ const MAP: Record<string, NegMessage> = {
 };
 
 export function humanizeException(e: ExceptionRow): NegMessage {
+  if (e.code === "RISK_RED" && e.detail?.kind === "COMPLIANCE") {
+    return {
+      what: "Compliance screening blocked this offer.",
+      why: "The selected customer is flagged as a sanctions match in the demo screening data. The risk engine set RED (score 0) and skipped weighted credit scoring.",
+      next: "Confirm the intended customer and follow the compliance process. Changing the vehicle or lease terms will not clear a customer-level sanctions block.",
+    };
+  }
+  if (e.code === "RISK_RED" && e.detail?.kind === "ECONOMIC") {
+    return {
+      what: "The weighted risk score is below the required threshold.",
+      why: "This is an economic RED based on customer credit, financial strength, exposure relative to the credit limit, company age, and payment history.",
+      next: "Review the scoring factors and adjust the customer or exposure before trying again.",
+    };
+  }
   const base = MAP[e.code];
   if (base) return base;
   return {
@@ -88,6 +102,10 @@ export function humanizeException(e: ExceptionRow): NegMessage {
 }
 
 /** A compliance/terminal block cannot be fixed by editing terms — it needs a new offer or escalation. */
-export function isTerminalBlock(code: string): boolean {
-  return ["SANCTIONS_MATCH", "KYC_FAILED", "RISK_RED"].includes(code);
+export function isTerminalBlock(exception: ExceptionRow | string): boolean {
+  const code = typeof exception === "string" ? exception : exception.code;
+  if (code === "RISK_RED") {
+    return typeof exception !== "string" && exception.detail?.kind === "COMPLIANCE";
+  }
+  return ["SANCTIONS_MATCH", "KYC_FAILED"].includes(code);
 }
