@@ -11,6 +11,7 @@ import type { ChatMessage } from "@/lib/types";
 const EXAMPLES = [
   "Lease 3 BMW X1 for Musterlogistik, 36 months, 20,000 km/yr, with maintenance and insurance.",
   "I need 4-seater electric cars, 30 of them insured — budget €300k a month.",
+  "I need a leasing offer for 50 cars, with annual budget 400000 per year, and for 4 years",
 ];
 
 /** New offer = the same 60/40 workbench in COMPOSE mode. The agent chat on the right IS the intake;
