@@ -280,7 +280,7 @@ def _confirmation_scope(message: str) -> tuple[bool, list[str], bool]:
 
 
 def _recommend_default_vehicle(proposed: dict) -> tuple[dict, str | None]:
-    """Propose the lowest listed-price vehicle when a fleet request omits its asset."""
+    """Choose a catalogue asset by the requested budget when one is available."""
     if proposed.get("vehicle_key") or not proposed.get("quantity"):
         return proposed, None
     if proposed.get("make") or proposed.get("model") or proposed.get("filters"):
@@ -288,13 +288,56 @@ def _recommend_default_vehicle(proposed: dict) -> tuple[dict, str | None]:
     rows = list_vehicles()
     if not rows:
         return proposed, None
-    vehicle = min(rows, key=lambda row: Decimal(str(row.get("list_price_net") or "Infinity")))
+    vehicle = _budget_matched_vehicle(proposed, rows)
+    if vehicle is None:
+        vehicle = min(rows, key=lambda row: Decimal(str(row.get("list_price_net") or "Infinity")))
     proposed["vehicle_key"] = vehicle["key"]
     proposed["make"] = vehicle["make"]
     proposed["model"] = vehicle["commercial_name"]
     proposed["vehicle_recommended"] = True
     message = f"Suggested vehicle: {vehicle['label']}. You can confirm or change it in the wizard."
     return proposed, message
+
+
+def _budget_matched_vehicle(proposed: dict, rows: list[dict]) -> dict | None:
+    """Run candidate assets through the deterministic lease engine and select the closest budget fit."""
+    if not proposed.get("constraints"):
+        return None
+    try:
+        from app.engine.budget import catalogue_budget_fit
+        from app.core.policy import load_policy
+
+        policy = load_policy()
+        customer = (proposed.get("register_number")
+                    or (recommend_default_customer() or {}).get("register_number"))
+        if not customer:
+            return None
+        term = int(proposed.get("term_months") or policy.raw["term"]["preferred"][0])
+        mileage = int(proposed.get("annual_mileage_km") or policy.raw["mileage"]["baseline_annual_km"])
+        quantity = int(proposed.get("quantity") or 1)
+        candidate = build_b2b_offer(
+            _REGISTRY, vehicle_key=rows[0]["key"], register_number=customer,
+            term_months=term, annual_mileage_km=mileage, quantity=quantity,
+            special_payment_eur=Decimal(str(proposed.get("special_payment_eur") or 0)),
+            service_maintenance=bool(proposed.get("service_maintenance")),
+            service_tyres=bool(proposed.get("service_tyres")),
+            insurance=bool(proposed.get("insurance")))
+        candidate.agent_context = {"proposed": proposed}
+        ranked = catalogue_budget_fit(candidate, _REGISTRY, policy,
+                                      candidate_keys=[v["key"] for v in rows])
+        by_key = {v["key"]: v for v in rows}
+        # If at least one candidate fits, use the closest fit. If none fit, choose the cheapest
+        # priced candidate so the user gets the best available starting point without a claim of fit.
+        fitting = [r for r in ranked if r.get("priced") and r.get("fits_budget")]
+        priced = [r for r in ranked if r.get("priced")]
+        choices = fitting or sorted(
+            priced, key=lambda r: Decimal(str(by_key.get(r["vehicle_key"], {}).get("list_price_net") or "Infinity")))
+        if not choices:
+            return None
+        return by_key.get(choices[0]["vehicle_key"])
+    except Exception:
+        # Missing terms, customer context, or engine dependencies should not stop intake.
+        return None
 
 
 def _recommend_default_customer(proposed: dict) -> tuple[dict, str | None]:
@@ -417,15 +460,94 @@ def _explicit_pricing_confirmation(message: str) -> bool:
         "yes start calculating", "yes start pricing", "go ahead and calculate",
         "go ahead and price it", "please calculate", "please calculate it",
         "please calculate pricing", "please start calculating", "confirm and price it",
+        "yes proceed", "yes proceed with pricing", "proceed with pricing", "proceed to pricing",
+        "yes go ahead", "go ahead", "yes please proceed",
     }
     if text in exact:
         return True
     return bool(re.fullmatch(
         r"(?:(?:yes|please|okay|ok|go ahead|can you|could you|let s)\s+)*(?:start\s+)?"
         r"(?:calculat(?:e|ing|ion)(?:\s+(?:the\s+)?(?:pricing|scenarios?))?|"
-        r"pric(?:e it|ing)|run pricing)(?:\s+now)?",
+        r"pric(?:e it|ing)|run pricing|proceed(?:\s+with\s+pricing|\s+to\s+pricing)?)(?:\s+now)?",
         text,
     ))
+
+
+def _offer_context_for_agent(offer: Offer, proposed: dict) -> str:
+    """Give the turn planner compact, factual pricing and risk state from this offer."""
+    parts = []
+    constraints = proposed.get("constraints") or []
+    budgets = [c for c in constraints if (c.get("kind") or "").lower() in ("budget", "monthly_cap")]
+    if budgets:
+        b = budgets[-1]
+        parts.append(f"Budget: {b.get('currency') or 'EUR'} {b.get('value')} ({b.get('basis') or 'basis unspecified'}).")
+    if offer.calculation:
+        c = offer.calculation.value
+        parts.append(f"Current engine calculation: EUR {c.monthly_gross_eur}/vehicle/month; "
+                     f"EUR {c.total_monthly_gross_eur}/fleet/month; term {offer.commercial.term_months.value} months.")
+        if budgets and b.get("value") not in (None, ""):
+            try:
+                from app.engine.budget import fit_metric
+                metric = fit_metric(c, int(offer.commercial.term_months.value),
+                                   (b.get("basis") or "unknown").lower())
+                parts.append(f"Budget comparison metric: EUR {metric}; budget EUR {b['value']}; "
+                             f"{'within' if metric <= Decimal(str(b['value'])) else 'over'} budget.")
+            except (ValueError, TypeError, ArithmeticError):
+                pass
+    if offer.scoring:
+        score = offer.scoring.value
+        factors = ", ".join(f"{f.name} {f.score_0_100}" for f in score.factors)
+        parts.append(f"Risk result: {score.band.value}, score {score.mvp_risk_score}; "
+                     f"classification {score.red_kind.value if score.red_kind else 'none'}; "
+                     f"hard blocks {', '.join(score.hard_blocks) or 'none'}; factors: {factors or 'unavailable'}.")
+    if offer.exceptions:
+        details = []
+        for e in offer.exceptions:
+            if e.code in {"RISK_RED", "RISK_YELLOW", "SCORING_MANUAL_REVIEW"}:
+                details.append(f"{e.code}: {e.detail}")
+        if details:
+            parts.append("Risk/pricing notices: " + "; ".join(details) + ".")
+    if not parts:
+        parts.append("Pricing and risk have not been calculated for this request yet.")
+    return " ".join(parts)
+
+
+def _affordability_answer(message: str, offer: Offer) -> str | None:
+    """Answer affordability/risk questions from deterministic offer results, not recap text."""
+    text = (message or "").lower()
+    asks_why = any(p in text for p in (
+        "why", "explain", "reason", "how come", "what made", "what caused"))
+    asks_affordability = any(p in text for p in (
+        "afford", "budget", "over budget", "red", "risk", "exposure", "credit limit"))
+    if not (asks_why and asks_affordability):
+        return None
+    scoring = offer.scoring.value if offer.scoring else None
+    if scoring and scoring.red_kind and scoring.red_kind.value == "ECONOMIC":
+        factors = {f.name: f for f in scoring.factors}
+        exposure_factor = factors.get("exposure_vs_limit")
+        acquisition = offer.vehicle.acquisition_price_net.value
+        quantity = int(offer.commercial.quantity.value or 1)
+        exposure = acquisition * quantity if acquisition is not None else None
+        limit = offer.customer.credit.recommended_limit_eur if offer.customer.credit else None
+        explanation = "The risk result is based on fleet exposure versus the customer's recommended credit limit, not the annual rental budget."
+        if exposure is not None and limit is not None:
+            ratio = (exposure / limit * Decimal("100")) if limit else None
+            explanation += (f" The estimated acquisition exposure is €{exposure:,.0f} "
+                            f"({quantity} × €{acquisition:,.0f}) against a €{limit:,.0f} limit"
+                            + (f" ({ratio:.1f}%)." if ratio is not None else "."))
+        if exposure_factor:
+            explanation += f" The exposure factor scored {exposure_factor.score_0_100}/100, contributing {exposure_factor.contribution} points."
+        if offer.calculation:
+            calc = offer.calculation.value
+            explanation += (f" The calculated lease is €{calc.total_monthly_gross_eur:,.2f} per month for the fleet "
+                            f"(€{calc.total_monthly_gross_eur * 12:,.2f} per year).")
+        else:
+            explanation += " Lease affordability is assessed from the engine-priced payment once pricing succeeds."
+        return explanation
+    if offer.calculation:
+        return (f"The engine-priced fleet payment is €{offer.calculation.value.total_monthly_gross_eur:,.2f} per month. "
+                "I can compare it with the stated budget in the same period and basis.")
+    return "Pricing has not completed yet, so I can’t determine budget affordability from a lease payment. The offer is still available to calculate once the required details are confirmed."
 
 
 def agent_turn_node(state) -> dict:
@@ -470,6 +592,7 @@ def agent_turn_node(state) -> dict:
     # free-text chat turn — the agent interprets intent (set / confirm / proceed / answer questions)
     msg = reply.get("message")
     if msg:
+        previous_messages = ac.get("messages", [])
         ac.setdefault("messages", []).append({"role": "user", "content": msg})
         scoped_all, scoped_fields, ambiguous_confirmation = _confirmation_scope(msg)
         awaiting_target = bool(ac.get("awaiting_confirmation_field"))
@@ -497,9 +620,17 @@ def agent_turn_node(state) -> dict:
             standalone_reply = True
         else:
             catalogue_answer = _catalogue_answer(msg, proposed)
+            if catalogue_answer is None:
+                catalogue_answer = _affordability_answer(msg, offer)
+            if catalogue_answer:
+                standalone_reply = True
         pricing_confirmation = _explicit_pricing_confirmation(msg)
         plan = None if catalogue_answer or pricing_confirmation else plan_turn(
-            msg, F.summary(fs, proposed), F.options_summary())
+            msg, F.summary(fs, proposed), F.options_summary(),
+            recent_history="\n".join(
+                f"{m.get('role', 'unknown')}: {m.get('content', '')}"
+                for m in previous_messages[-10:] if m.get("content")),
+            offer_context=_offer_context_for_agent(offer, proposed))
         if plan is not None:
             for k, v in (plan.set or {}).items():
                 if k in _TURN_SET_KEYS and v not in (None, ""):
@@ -573,6 +704,10 @@ def agent_turn_node(state) -> dict:
         line = agent_reply
     elif start_pricing:
         line = "All required fields are confirmed. I’ll calculate the pricing scenario now."
+    elif agent_reply:
+        nxt = F.next_prompt(fs, proposed)
+        line = agent_reply if all_confirmed or ("price it" in agent_reply.lower() or nxt in agent_reply) \
+            else agent_reply.rstrip(". ") + ". " + nxt
     elif all_confirmed:
         recap_fields = ("channel", "customer", "product", "asset", "term", "mileage", "quantity",
                         "special_payment", "maintenance", "tyres", "insurance")
@@ -586,10 +721,6 @@ def agent_turn_node(state) -> dict:
             recap += f"; Budget: {budget.get('currency') or 'EUR'} {budget.get('value')} ({budget.get('basis') or 'basis not specified'})"
         line = ("Everything is confirmed: " + recap
                 + ". Should I start the pricing calculation? Reply ‘yes, calculate’ or ‘price it’.")
-    elif agent_reply:
-        nxt = F.next_prompt(fs, proposed)
-        line = agent_reply if ("price it" in agent_reply.lower() or nxt in agent_reply) \
-            else agent_reply.rstrip(". ") + ". " + nxt
     else:
         line = F.echo(ripple, fs, proposed)
     if line:

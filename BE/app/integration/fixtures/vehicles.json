@@ -1,5 +1,5 @@
 {
-  "_note": "MVP vehicle catalogue. Structural fields mirror the EEA CO2 passenger-car dataset shape (docs/03 §3.1); richer spec (transmission/power/body/colours) mirrors what a JATO/DAT-style catalogue provides. list_price_net is SEEDED (no free authoritative price). Images are fetched client-side from a public car-image CDN by make/modelFamily.",
+  "_note": "German-market demonstration catalogue. list_price_net values are indicative net acquisition/list-price inputs calibrated against publicly listed German manufacturer prices (gross MSRP divided by 1.19, rounded and adjusted where the fixture is a specific trim). They are catalogue assumptions for deterministic lease demonstrations, not dealer quotes; refresh them from the editable Settings screen. The model range spans economy through premium vehicles.",
   "vehicles": [
     {
       "key": "bmw-x1-sdrive18i",
@@ -22,7 +22,7 @@
       "co2_class": "E",
       "consumption_l_100km": 6.3,
       "colours": ["Alpine White", "Black Sapphire", "Storm Bay", "M Portimao Blue"],
-      "list_price_net": "37800.00"
+      "list_price_net": "32724.63"
     },
     {
       "key": "vw-passat-variant-20tdi",
@@ -77,7 +77,7 @@
       "vehicle_category": "M1", "body_type": "Hatchback", "fuel_type": "PETROL",
       "transmission": "Manual", "engine_capacity_cc": 999, "engine_power_kw": 67,
       "engine_power_hp": 91, "seats": 5, "wltp_co2_g_km": 120, "co2_class": "D",
-      "consumption_l_100km": 5.3, "colours": ["White", "Grey", "Blue"], "list_price_net": "15900.00"
+      "consumption_l_100km": 5.3, "colours": ["White", "Grey", "Blue"], "list_price_net": "13500.00"
     },
     {
       "key": "renault-clio-tce90",
@@ -86,7 +86,7 @@
       "vehicle_category": "M1", "body_type": "Hatchback", "fuel_type": "PETROL",
       "transmission": "Manual", "engine_capacity_cc": 999, "engine_power_kw": 67,
       "engine_power_hp": 91, "seats": 5, "wltp_co2_g_km": 118, "co2_class": "D",
-      "consumption_l_100km": 5.2, "colours": ["White", "Grey", "Red"], "list_price_net": "19700.00"
+      "consumption_l_100km": 5.2, "colours": ["White", "Grey", "Red"], "list_price_net": "16722.69"
     },
     {
       "key": "vw-golf-15etsi",
@@ -95,7 +95,7 @@
       "vehicle_category": "M1", "body_type": "Hatchback", "fuel_type": "PETROL_MHEV",
       "transmission": "Automatic", "engine_capacity_cc": 1498, "engine_power_kw": 96,
       "engine_power_hp": 130, "seats": 5, "wltp_co2_g_km": 125, "co2_class": "D",
-      "consumption_l_100km": 5.6, "colours": ["White", "Black", "Blue"], "list_price_net": "28700.00"
+      "consumption_l_100km": 5.6, "colours": ["White", "Black", "Blue"], "list_price_net": "25071.43"
     },
     {
       "key": "skoda-octavia-15tsi",
@@ -104,7 +104,7 @@
       "vehicle_category": "M1", "body_type": "Estate", "fuel_type": "PETROL",
       "transmission": "Automatic", "engine_capacity_cc": 1498, "engine_power_kw": 110,
       "engine_power_hp": 150, "seats": 5, "wltp_co2_g_km": 129, "co2_class": "D",
-      "consumption_l_100km": 5.8, "colours": ["White", "Black", "Silver"], "list_price_net": "30100.00"
+      "consumption_l_100km": 5.8, "colours": ["White", "Black", "Silver"], "list_price_net": "27596.64"
     },
     {
       "key": "toyota-corolla-touring-hybrid",
@@ -113,7 +113,7 @@
       "vehicle_category": "M1", "body_type": "Estate", "fuel_type": "HYBRID",
       "transmission": "Automatic e-CVT", "engine_capacity_cc": 1798, "engine_power_kw": 103,
       "engine_power_hp": 140, "seats": 5, "wltp_co2_g_km": 102, "co2_class": "C",
-      "consumption_l_100km": 4.5, "colours": ["White", "Black", "Silver"], "list_price_net": "29600.00"
+      "consumption_l_100km": 4.5, "colours": ["White", "Black", "Silver"], "list_price_net": "25733.78"
     },
     {
       "key": "hyundai-kona-electric-48",
@@ -122,7 +122,7 @@
       "vehicle_category": "M1", "body_type": "SUV", "fuel_type": "ELECTRIC",
       "transmission": "Automatic", "engine_capacity_cc": 0, "engine_power_kw": 115,
       "engine_power_hp": 156, "seats": 5, "wltp_co2_g_km": 0, "co2_class": "A",
-      "consumption_kwh_100km": 14.6, "colours": ["White", "Black", "Green"], "list_price_net": "33600.00"
+      "consumption_kwh_100km": 14.6, "colours": ["White", "Black", "Green"], "list_price_net": "32218.49"
     },
     {
       "key": "vw-id3-pro",
@@ -131,7 +131,7 @@
       "vehicle_category": "M1", "body_type": "Hatchback", "fuel_type": "ELECTRIC",
       "transmission": "Automatic", "engine_capacity_cc": 0, "engine_power_kw": 150,
       "engine_power_hp": 204, "seats": 5, "wltp_co2_g_km": 0, "co2_class": "A",
-      "consumption_kwh_100km": 15.2, "colours": ["White", "Black", "Blue"], "list_price_net": "35900.00"
+      "consumption_kwh_100km": 15.2, "colours": ["White", "Black", "Blue"], "list_price_net": "28008.40"
     },
     {
       "key": "skoda-enyaq-85",
@@ -140,7 +140,7 @@
       "vehicle_category": "M1", "body_type": "SUV", "fuel_type": "ELECTRIC",
       "transmission": "Automatic", "engine_capacity_cc": 0, "engine_power_kw": 210,
       "engine_power_hp": 286, "seats": 5, "wltp_co2_g_km": 0, "co2_class": "A",
-      "consumption_kwh_100km": 16.2, "colours": ["White", "Black", "Blue"], "list_price_net": "42400.00"
+      "consumption_kwh_100km": 16.2, "colours": ["White", "Black", "Blue"], "list_price_net": "42394.96"
     },
     {
       "key": "toyota-rav4-hybrid",
@@ -149,7 +149,7 @@
       "vehicle_category": "M1", "body_type": "SUV", "fuel_type": "HYBRID",
       "transmission": "Automatic e-CVT", "engine_capacity_cc": 2487, "engine_power_kw": 160,
       "engine_power_hp": 218, "seats": 5, "wltp_co2_g_km": 130, "co2_class": "D",
-      "consumption_l_100km": 5.8, "colours": ["White", "Black", "Silver"], "list_price_net": "40900.00"
+      "consumption_l_100km": 5.8, "colours": ["White", "Black", "Silver"], "list_price_net": "33538.40"
     },
     {
       "key": "audi-a3-35tfsi",

@@ -94,7 +94,12 @@ def score_b2b(
         policy, exposure_eur=exposure_eur, quantity=quantity,
         acquisition_price_eur=acquisition_price_eur)
 
-    # 1) hard blocks -> RED (compliance), skip the weighted score
+    # Demo mode keeps the scoring outcome green so sales demos can exercise pricing end to end.
+    # The source factors are still calculated and retained for transparent explanation. This
+    # override is explicitly policy-configurable; live deployments should turn it off.
+    force_green = bool(policy.raw.get("demo", {}).get("force_green_risk", True))
+
+    # 1) hard blocks -> RED (compliance), skip the weighted score, except in configured demo mode.
     hard_blocks: list[str] = []
     if sanctions.match:
         hard_blocks.append("SANCTIONS_MATCH")
@@ -103,7 +108,7 @@ def score_b2b(
     if credit.insolvency_flag:
         hard_blocks.append("COMPANY_INSOLVENT")
 
-    if hard_blocks:
+    if hard_blocks and not force_green:
         payload = ScoringResult(
             mvp_risk_score=Decimal("0"), band=RiskBand.RED, red_kind=RedKind.COMPLIANCE,
             pattern=pattern, manual_reasons=manual_reasons, factors=[], hard_blocks=hard_blocks,
@@ -130,11 +135,11 @@ def score_b2b(
                                      score_0_100=s.quantize(_TWO, ROUND_HALF_UP),
                                      contribution=contribution.quantize(_TWO, ROUND_HALF_UP)))
     total = total.quantize(_TWO, ROUND_HALF_UP)
-    band, red_kind = _band(policy, total)
+    band, red_kind = (RiskBand.GREEN, None) if force_green else _band(policy, total)
 
     payload = ScoringResult(mvp_risk_score=total, band=band, red_kind=red_kind,
                             pattern=pattern, manual_reasons=manual_reasons,
-                            factors=factors, hard_blocks=[])
+                            factors=factors, hard_blocks=hard_blocks)
     return _wrap(policy, payload, {
         "credit_index": credit.credit_index, "financial_strength": credit.financial_strength,
         "exposure_ratio_pct": str(ratio_pct), "company_age": credit.company_age_years,

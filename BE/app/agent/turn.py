@@ -55,6 +55,10 @@ _SYSTEM = (
     "- set `proceed` when they want to price/continue;\n"
     "- write a concise `reply` that answers their question and, if they ask for options (e.g. channels "
     "or products), lists ONLY the provided options.\n"
+    "Use the recent conversation and current offer/pricing/risk context to answer follow-up questions "
+    "about earlier results. Answer the specific question first; never repeat a full offer recap unless "
+    "the salesperson asks for one. Do not ask for pricing confirmation again if the current message "
+    "clearly gives that confirmation.\n"
     "Keep replies brief and focused on the user's offer workflow and the next wizard action. Do not "
     "describe internal implementation details or call catalogue, customer, or risk records demo, "
     "mock, seeded, or provisional. Never claim that a customer identity, KYC, sanctions, or credit "
@@ -64,10 +68,13 @@ _SYSTEM = (
 )
 
 
-def plan_turn(message: str, fields_summary: str, options_summary: str) -> Optional[TurnPlan]:
+def plan_turn(message: str, fields_summary: str, options_summary: str,
+              recent_history: str = "", offer_context: str = "") -> Optional[TurnPlan]:
     if not llm.llm_available() or not (message or "").strip():
         return None
     user = (f"CURRENT FIELDS:\n{fields_summary}\n\n"
+            f"RECENT CONVERSATION (oldest first):\n{recent_history or '(no earlier turns)'}\n\n"
+            f"CURRENT OFFER / PRICING / RISK CONTEXT:\n{offer_context or '(not calculated yet)'}\n\n"
             f"REFERENCE OPTIONS:\n{options_summary}\n\n"
             f"SALESPERSON MESSAGE:\n{message}")
     try:

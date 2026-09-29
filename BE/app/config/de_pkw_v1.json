@@ -52,6 +52,7 @@
   },
 
   "risk": { "green_min": 75, "yellow_min": 55, "red_max": 54.99 },
+  "demo": { "force_green_risk": true },
 
   "_note_automatic_envelope": "Spec §3.11: scoring is AUTOMATIC when the offer parameters match the predefined automatic process, else MANUAL (manual review). This envelope defines that predefined process for the MVP; any parameter outside it routes the outcome to human review. Controlled reference data — the Agent never decides the pattern.",
   "scoring_automatic_envelope": {
