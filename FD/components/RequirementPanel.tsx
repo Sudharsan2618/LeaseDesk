@@ -120,7 +120,8 @@ export function RequirementPanel({
   }));
   const customerChoices: Choice[] = customers.map((customer) => ({
     key: customer.register_number, label: customer.legal_name,
-    detail: customer.legal_form ?? "Company",
+    detail: customer.legal_form && !/^demo company$/i.test(customer.legal_form.trim())
+      ? customer.legal_form : undefined,
     overrides: { register_number: customer.register_number },
   }));
   const vehicleChoices: Choice[] = vehicles.map((vehicle) => ({
