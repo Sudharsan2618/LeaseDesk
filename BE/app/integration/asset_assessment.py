@@ -28,4 +28,10 @@ class AssetAssessmentAdapter:
         if self.mode is not AdapterMode.MOCK:
             raise ExternalServiceUnavailable("only MOCK mode wired for asset assessment")
         # Representative deterministic outcome: the object is assessable and passes.
-        return {"result": "PASS", "detail": "representative MVP assessment (mock)"}
+        from app.db.mongo_settings import get_setting
+        configured = get_setting("engine_inputs")
+        inputs = configured["data"] if configured else {}
+        return {
+            "result": inputs.get("asset_assessment_result", "PASS"),
+            "detail": inputs.get("asset_assessment_detail", "representative MVP assessment (mock)"),
+        }

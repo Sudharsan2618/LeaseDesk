@@ -21,7 +21,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const path = usePathname();
   const isOffers = path === "/" || path.startsWith("/offers");
   const isAudit = path.startsWith("/audit");
-  const activeId = isAudit ? "audit" : isOffers ? "dashboard" : "";
+  const isSettings = path.startsWith("/settings");
+  const activeId = isAudit ? "audit" : isSettings ? "settings" : isOffers ? "dashboard" : "";
 
   const [collapsed, setCollapsed] = useState(false);
   const [dark, setDark] = useState(false);
@@ -198,7 +199,7 @@ const SECTIONS: NavSection[] = [
   ] },
 ];
 
-const SETTINGS: NavItem = { id: "settings", label: "Settings", icon: "settings", soon: true };
+const SETTINGS: NavItem = { id: "settings", label: "Settings", icon: "settings", href: "/settings" };
 
 /* ── Brand mark (matches app/icon.svg / favicon) ── */
 function BrandMark({ size = 30 }: { size?: number }) {

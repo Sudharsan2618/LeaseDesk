@@ -220,17 +220,14 @@ def _catalogue_answer(message: str, proposed: dict) -> str | None:
         return None
     if any(word in text for word in ("customer", "company", "partner", "client")):
         rows = list_customers()
-        names = "; ".join(f'{c["legal_name"]} ({c["register_number"]})' for c in rows)
-        return (f"The current demo customer directory has {len(rows)} options: {names}. "
-                "These are seeded mock records; tell me the customer name you want to use.")
+        names = "; ".join(c["legal_name"] for c in rows)
+        return f"Available customers ({len(rows)}): {names}. Choose one in the wizard or tell me the customer name."
     if any(word in text for word in ("vehicle", "car", "asset", "model")):
         rows = list_vehicles()
-        return "The current demo vehicle catalogue has: " + "; ".join(v["label"] for v in rows) + "."
+        return "Available vehicles: " + "; ".join(v["label"] for v in rows) + ". Choose one in the wizard."
     if "channel" in text:
         ref = load_reference_data()
-        choices = "; ".join(
-            f"{c.name_en} ({'active' if c.status == 'active' else 'demo stub'})"
-            for c in ref.channels)
+        choices = "; ".join(c.name_en for c in ref.channels if c.status == "active")
         current = ref.channel(proposed.get("channel"))
         selected = f" Current selection: {current.name_en}." if current else ""
         return "Channel options: " + choices + "." + selected
@@ -296,16 +293,12 @@ def _recommend_default_vehicle(proposed: dict) -> tuple[dict, str | None]:
     proposed["make"] = vehicle["make"]
     proposed["model"] = vehicle["commercial_name"]
     proposed["vehicle_recommended"] = True
-    message = (
-        f"Asset recommendation: {vehicle['label']} at €{Decimal(str(vehicle['list_price_net'])):,.0f} "
-        "net list price, the lowest-priced option in the seeded demo catalogue. This is a provisional "
-        "starting point, not a lease quote or a confirmed budget fit."
-    )
+    message = f"Suggested vehicle: {vehicle['label']}. You can confirm or change it in the wizard."
     return proposed, message
 
 
 def _recommend_default_customer(proposed: dict) -> tuple[dict, str | None]:
-    """Propose a mock customer profile sized to the preliminary fleet exposure, if possible."""
+    """Suggest a configured customer profile sized to the preliminary fleet exposure, if possible."""
     if proposed.get("register_number") or proposed.get("company_hint"):
         return proposed, None
     quantity = int(proposed.get("quantity") or 0)
@@ -314,76 +307,17 @@ def _recommend_default_customer(proposed: dict) -> tuple[dict, str | None]:
                       if vehicle and quantity > 0 else None)
     customer = recommend_default_customer(rough_exposure)
     if not customer:
-        if rough_exposure is not None:
-            return proposed, (
-                f"I couldn't find a verified, sanctions-clear green demo profile with a recommended "
-                f"credit limit covering the preliminary fleet exposure of €{rough_exposure:,.0f}. "
-                "Please select the actual customer from the directory; I won't guess their identity."
-            )
         return proposed, None
     proposed["register_number"] = customer["register_number"]
     proposed["customer_recommended"] = True
-    if rough_exposure is not None:
-        return proposed, (
-            f"Based on the provisional asset and fleet size, estimated acquisition exposure is "
-            f"€{rough_exposure:,.0f} ({quantity} × €{Decimal(str(vehicle['list_price_net'])):,.0f} net). "
-            f"Of the seeded demo profiles, {customer['legal_name']} ({customer['register_number']}) "
-            f"is the green, KYC-complete, sanctions-clear profile with a recommended limit covering "
-            f"that estimate (€{customer['recommended_limit_eur']:,.0f}). This is mock risk data, "
-            "not verification of your customer's identity; confirm it is the intended customer or "
-            "give me the correct name."
-        )
     return proposed, (
-        f"You didn't specify a customer. The demo directory's configured sample is "
-        f"{customer['legal_name']} ({customer['register_number']}). I've proposed it for this "
-        "offer; this is mock data, not verification of customer identity. Please confirm it or tell me another customer."
+        f"Suggested customer: {customer['legal_name']}. You can confirm or change it in the wizard."
     )
 
 
-def _initial_agent_message(proposed: dict, customer_note: str | None,
-                           asset_note: str | None) -> str:
-    """Give the user a concise, evidence-based recap of initial proposals and remaining inputs."""
-    facts = []
-    if proposed.get("channel"):
-        facts.append(f"channel {str(proposed['channel']).replace('_', ' ').title()}")
-    if proposed.get("leasing_product"):
-        facts.append(f"product {str(proposed['leasing_product']).replace('_', ' ').title()}")
-    quantity = proposed.get("quantity")
-    term = proposed.get("term_months")
-    if quantity:
-        facts.append(f"{quantity} vehicles")
-    if proposed.get("register_number") and not customer_note:
-        facts.append(f"customer {customer_label(proposed['register_number']) or proposed['register_number']}")
-    if proposed.get("vehicle_key") and not asset_note:
-        facts.append(f"asset {vehicle_label(proposed['vehicle_key']) or proposed['vehicle_key']}")
-    if term:
-        facts.append(f"{term}-month term")
-    mileage = proposed.get("annual_mileage_km")
-    if mileage:
-        facts.append(f"{int(mileage):,} km/year")
-    budgets = [c for c in (proposed.get("constraints") or [])
-               if (c.get("kind") or "").lower() in ("budget", "monthly_cap")]
-    if budgets:
-        budget = budgets[-1]
-        basis = budget.get("basis") or "basis not specified"
-        currency = budget.get("currency") or "EUR"
-        symbol = {"EUR": "€", "€": "€", "USD": "$", "$": "$", "GBP": "£", "£": "£"}.get(
-            currency.upper(), currency)
-        try:
-            amount = f"{Decimal(str(budget.get('value'))):,.0f}"
-        except (InvalidOperation, ValueError, TypeError):
-            amount = str(budget.get("value"))
-        basis_label = {"annual": "per year", "monthly": "per month", "per_vehicle": "per vehicle"}.get(
-            basis, basis)
-        facts.append(f"{symbol}{amount} {basis_label} budget")
-    intro = "Offer setup: " + ("; ".join(facts) if facts else "I’ve read your request") + "."
-    recommendations = " ".join(note for note in (customer_note, asset_note) if note)
-    mileage_note = (" I still need annual mileage to price the fleet against your budget."
-                    if not proposed.get("annual_mileage_km") else "")
-    footer = (" The vehicle figure is catalogue list price, not an engine-priced lease quote."
-              + mileage_note + " Please confirm or change the proposals; after the required fields "
-              "are confirmed, I'll recap them and ask before calculating.")
-    return f"{intro} {recommendations}{footer}" if recommendations else f"{intro}{footer}"
+def _initial_agent_message() -> str:
+    """Keep the opening focused on the next action; the wizard shows values and recommendations."""
+    return "I’ve captured your request. Please answer or confirm each question in the wizard to continue with the offer calculation."
 
 
 def _apply_turn(proposed: dict, reply: dict) -> dict:
@@ -463,7 +397,7 @@ def understand_node(state) -> dict:
     proposed, asset_note = _recommend_default_vehicle(proposed)
     proposed, customer_note = _recommend_default_customer(proposed)
     transcript.append({"role": "assistant",
-                       "content": _initial_agent_message(proposed, customer_note, asset_note)})
+                       "content": _initial_agent_message()})
     ac["messages"] = transcript
     ac["proposed"] = proposed
     offer.agent_context = ac
@@ -614,6 +548,21 @@ def agent_turn_node(state) -> dict:
     for f in confirm_fields:                                    # per-field confirmations (chat or card)
         if f in fs and F._has(f, proposed):
             fs[f]["status"] = "confirmed"
+
+    # Record structured wizard actions as user messages too, so the chosen values stay visible
+    # in the shared chat transcript (not just in the field panel).
+    structured_fields = user_fields | set(confirm_fields)
+    if confirm_all:
+        structured_fields |= {f for f, status in fs.items()
+                              if status.get("status") == "confirmed" and F._has(f, proposed)}
+    if not msg:
+        for field in F.ORDER:
+            if field not in structured_fields or not F._has(field, proposed):
+                continue
+            value = F.display(field, proposed)
+            action = "Selected" if field in confirm_fields or confirm_all else "Set"
+            ac.setdefault("messages", []).append({
+                "role": "user", "content": f"{action} {F.LABELS[field]}: {value}"})
 
     # Completing the last field is not consent to start pricing. Only an explicit pricing
     # confirmation on this turn may hand off to the deterministic calculation graph.
@@ -887,7 +836,7 @@ def _correction_message(offer: Offer) -> str:
             and offer.scoring.value.red_kind and offer.scoring.value.red_kind.value == "COMPLIANCE"):
         hard_blocks = set(offer.scoring.value.hard_blocks or [])
         if "SANCTIONS_MATCH" in hard_blocks:
-            message = ("The selected customer matched sanctions screening in the demo data, so this offer is "
+            message = ("The selected customer matched the configured sanctions screening records, so this offer is "
                        "blocked for compliance (risk score 0). Changing the vehicle or lease terms will not "
                        "clear a customer-level match; confirm the intended customer and follow compliance review.")
             manual = next((e for e in offer.exceptions if e.code == "SCORING_MANUAL_REVIEW"), None)

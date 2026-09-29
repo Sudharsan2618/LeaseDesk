@@ -47,7 +47,7 @@ def run_pipeline_node(state: OfferState) -> dict:
 
 
 def scenarios_node(state: OfferState) -> dict:
-    """Price the requested terms as one scenario + budget-fit tagging when a budget is set."""
+    """Price the requested terms with optional service-bundle alternatives."""
     from app.engine.budget import annotate_scenarios
     offer = _load(state)
     policy = load_policy(offer.policy_version)

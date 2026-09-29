@@ -34,7 +34,7 @@ def compute_residual(
 
     # mileage adjustment (asymmetric; capped) relative to the baseline
     diff = Decimal(annual_mileage_km - policy.mileage_baseline)
-    steps = diff / Decimal("5000")
+    steps = diff / Decimal(str(policy.raw["mileage"]["step_km"]))
     if diff > 0:
         penalty = steps * Decimal(str(r["extra_5000km_penalty_pp"]))
         penalty = min(penalty, Decimal(str(r["mileage_penalty_cap_pp"])))
@@ -46,8 +46,9 @@ def compute_residual(
     else:
         mileage_adj = Decimal("0")
 
-    # vehicle age adjustment (MVP: new = 0; used = -2pp per full year)
-    age_adj = Decimal("-2") * Decimal(vehicle_age_years) if is_used else Decimal("0")
+    # vehicle age adjustment (MVP: new = 0; used vehicles accrue a configurable pp deduction/year)
+    age_penalty = Decimal(str(r["used_vehicle_age_penalty_pp_per_year"]))
+    age_adj = -age_penalty * Decimal(vehicle_age_years) if is_used else Decimal("0")
     market_adj = Decimal("0")  # reserved for future market signal
 
     rv_pct = _clamp(
@@ -57,7 +58,8 @@ def compute_residual(
     )
     rv_amount = (list_price_net * rv_pct / Decimal("100")).quantize(_TWO, ROUND_HALF_UP)
 
-    confidence = _confidence(term_months, annual_mileage_km, is_used, vehicle_age_years, data_complete)
+    confidence = _confidence(policy, term_months, annual_mileage_km, is_used, vehicle_age_years,
+                             data_complete)
 
     assumptions = [
         "used_vehicle" if is_used else "new_vehicle",
@@ -84,12 +86,18 @@ def compute_residual(
     )
 
 
-def _confidence(term_months: int, annual_mileage_km: int, is_used: bool,
+def _confidence(policy: Policy, term_months: int, annual_mileage_km: int, is_used: bool,
                 vehicle_age_years: int, data_complete: bool) -> ResidualConfidence:
+    rules = policy.residual["confidence"]
     # LOW wins if any low condition holds
-    if (is_used and vehicle_age_years > 3) or annual_mileage_km > 35000 or not data_complete:
+    if ((is_used and vehicle_age_years > int(rules["low_if_used_age_over_years"]))
+            or annual_mileage_km > int(rules["low_if_annual_mileage_over_km"])
+            or not data_complete):
         return ResidualConfidence.LOW
     # HIGH requires all of: new, term<=48, km<=25000, complete data
-    if (not is_used) and term_months <= 48 and annual_mileage_km <= 25000 and data_complete:
+    if ((not is_used)
+            and term_months <= int(rules["high_max_term_months"])
+            and annual_mileage_km <= int(rules["high_max_annual_mileage_km"])
+            and data_complete):
         return ResidualConfidence.HIGH
     return ResidualConfidence.MEDIUM

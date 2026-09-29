@@ -55,6 +55,10 @@ _SYSTEM = (
     "- set `proceed` when they want to price/continue;\n"
     "- write a concise `reply` that answers their question and, if they ask for options (e.g. channels "
     "or products), lists ONLY the provided options.\n"
+    "Keep replies brief and focused on the user's offer workflow and the next wizard action. Do not "
+    "describe internal implementation details or call catalogue, customer, or risk records demo, "
+    "mock, seeded, or provisional. Never claim that a customer identity, KYC, sanctions, or credit "
+    "status is verified unless that fact is explicitly provided as authoritative input.\n"
     "Write `reply` in the SAME language the salesperson used in their message.\n"
     "Never invent option values or field values you were not given. You never price, score or approve."
 )

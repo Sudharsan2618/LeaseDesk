@@ -132,7 +132,16 @@ export interface ChatMessage {
 
 export type StepKey = "channel" | "partner" | "product" | "asset" | "commercial";
 
-export interface RefOption { key: string; label: string; status?: string; business_line?: string; asset_category?: string; }
+export interface RefOption {
+  key: string;
+  name_en?: string;
+  name_de?: string;
+  label?: string;
+  description_en?: string;
+  status?: string;
+  business_line?: string;
+  asset_category?: string;
+}
 export interface PartnerCandidate { register_number: string; legal_name: string; legal_form?: string; label: string; }
 export interface Ambiguity { field: string; reason: string; options?: string[]; }
 export interface ConstraintRow { kind: string; value?: number | null; currency?: string | null; basis?: string | null; note?: string | null; }

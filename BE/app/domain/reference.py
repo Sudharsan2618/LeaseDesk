@@ -11,7 +11,6 @@ it (BR-08/09). PKW is active and fully wired; Equipment/NFZ/ITK are declared but
 from __future__ import annotations
 
 import json
-from functools import lru_cache
 from pathlib import Path
 from typing import Any, Optional
 
@@ -125,8 +124,14 @@ class ReferenceData(BaseModel):
         return p.policy_id if p else None
 
 
-@lru_cache(maxsize=1)
 def load_reference_data() -> ReferenceData:
+    from app.db.mongo_settings import get_setting
+
+    configured = get_setting("reference_data")
+    if configured:
+        raw: dict[str, Any] = dict(configured["data"])
+        raw.pop("_note", None)
+        return ReferenceData.model_validate(raw)
     path = _CONFIG_DIR / "reference_data.json"
     with path.open(encoding="utf-8") as fh:
         raw: dict[str, Any] = json.load(fh)

@@ -1,8 +1,8 @@
-"""Scenario engine: price the exact customer-requested commercial terms.
+"""Scenario engine: price the requested terms and clearly labelled optional service bundles.
 
-Every scenario re-runs residual -> funding -> margin -> calculate. The requested term, mileage,
-quantity, payment and service bundle are held fixed: alternative terms or add-ons are not silently
-introduced as if they were part of the request.
+Every scenario re-runs residual -> funding -> margin -> calculate. Asset, term, mileage, quantity,
+payment and every explicitly confirmed service choice stay fixed. Only unselected service options
+may be added as clearly labelled alternatives.
 
 Assumes run_pipeline has already assembled the customer context (credit/kyc/sanctions) and produced
 a non-RED band. RED offers are blocked and get no scenarios.
@@ -29,9 +29,7 @@ def _price_scenario(
     offer: Offer, policy: Policy, ref_rate, vat, *,
     term: int, maint: bool, tyres: bool, insurance: bool, label: str,
 ) -> Scenario | None:
-    """Price ONE scenario for a (term, service-bundle) combination. Returns None if the term is not a
-    valid alternative or cannot be priced. Vehicle / mileage / special payment / quantity are fixed to
-    the offer (the customer's choices)."""
+    """Price one bundle candidate. Customer-selected commercial terms are fixed to the offer."""
     mileage = offer.commercial.annual_mileage_km.value
     special = offer.commercial.special_payment_eur.value or Decimal("0")
     service_fee = offer.commercial.recurring_service_fee_eur.value or Decimal("0")
@@ -83,7 +81,7 @@ def generate_scenarios(
     term_options: Optional[list[int]] = None,
     max_scenarios: int = 4,
 ) -> list[Scenario]:
-    """Price one scenario using the request as stated; edits trigger a new price run."""
+    """Price the request plus alternatives that add only unselected service options."""
     policy = policy or load_policy(offer.policy_version)
 
     # only meaningful for a priced (GREEN/YELLOW) offer
@@ -99,10 +97,46 @@ def generate_scenarios(
     maint0 = bool(offer.commercial.service_maintenance.value)
     tyres0 = bool(offer.commercial.service_tyres.value)
     ins0 = bool(offer.commercial.insurance.value)
-    scenario = _price_scenario(offer, policy, ref_rate, vat, term=base_term,
-                               maint=maint0, tyres=tyres0, insurance=ins0,
-                               label=f"{base_term} mo")
-    offer.scenarios = [scenario] if scenario else []
+    base_bundle = {
+        "service_maintenance": maint0,
+        "service_tyres": tyres0,
+        "insurance": ins0,
+    }
+    field_state = (offer.agent_context or {}).get("field_state") or {}
+    # Confirmed service choices are fixed. Other service fields remain optional and may be added.
+    field_ids = {"service_maintenance": "maintenance", "service_tyres": "tyres", "insurance": "insurance"}
+    addable = [key for key, enabled in base_bundle.items()
+               if not enabled and field_state.get(field_ids[key], {}).get("status") != "confirmed"]
+
+    bundles: list[tuple[str, dict[str, bool]]] = [("Requested options", dict(base_bundle))]
+    if addable:
+        single_bundles = []
+        for key in addable:
+            bundle = dict(base_bundle)
+            bundle[key] = True
+            service_label = {"service_maintenance": "maintenance", "service_tyres": "tyres",
+                             "insurance": "insurance"}[key]
+            single_bundles.append((f"With {service_label}", bundle))
+
+        if len(addable) > 1:
+            full_bundle = dict(base_bundle)
+            for key in addable:
+                full_bundle[key] = True
+            bundles.extend(single_bundles[:max(0, max_scenarios - 2)])
+            bundles.append(("Full service bundle", full_bundle))
+        else:
+            bundles.extend(single_bundles)
+        bundles = bundles[:max_scenarios]
+
+    scenarios = []
+    for bundle_label, bundle in bundles:
+        scenario = _price_scenario(
+            offer, policy, ref_rate, vat, term=base_term,
+            maint=bundle["service_maintenance"], tyres=bundle["service_tyres"],
+            insurance=bundle["insurance"], label=f"{base_term} mo · {bundle_label}")
+        if scenario:
+            scenarios.append(scenario)
+    offer.scenarios = scenarios
     # A fresh scenario set has new ids — a selection from a previous pass (e.g. before an Adjust) now
     # dangles and would violate fk_selected_scenario on persist. Drop it so the user re-selects.
     if offer.selected_scenario_id not in {s.id for s in offer.scenarios}:

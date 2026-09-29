@@ -65,7 +65,7 @@
     "DEMO-APEX": {
       "persona": "GREEN_B2B_DEMO",
       "legal_name": "Apex",
-      "legal_form": "Demo company",
+      "legal_form": "Company",
       "vat_id": "DE700000007",
       "address": "Demo address, Berlin",
       "sanctions": { "match": false, "hits": [] },

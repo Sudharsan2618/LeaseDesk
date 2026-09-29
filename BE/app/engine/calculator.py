@@ -16,10 +16,12 @@ _CENTS = Decimal("0.01")
 
 
 def _per_km_rate(policy: Policy, vehicle_value_eur: Decimal) -> Decimal:
-    rates = policy.raw["mileage_settlement"]["per_km_rate_eur_by_vehicle_value"]
-    if vehicle_value_eur <= 30000:
+    settlement = policy.raw["mileage_settlement"]
+    rates = settlement["per_km_rate_eur_by_vehicle_value"]
+    thresholds = settlement["vehicle_value_thresholds_eur"]
+    if vehicle_value_eur <= Decimal(str(thresholds["lower"])):
         return Decimal(str(rates["le_30k"]))
-    if vehicle_value_eur <= 60000:
+    if vehicle_value_eur <= Decimal(str(thresholds["upper"])):
         return Decimal(str(rates["30k_60k"]))
     return Decimal(str(rates["gt_60k"]))
 

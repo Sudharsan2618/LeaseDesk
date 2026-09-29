@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import json
 from decimal import Decimal
-from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -213,8 +212,15 @@ class Policy:
         return self.raw["approval_limits"]
 
 
-@lru_cache(maxsize=8)
 def load_policy(policy_id: str = "DE_PKW_V1") -> Policy:
+    from app.db.mongo_settings import get_setting
+
+    configured = get_setting("policy")
+    if configured:
+        raw = configured["data"]
+        if raw.get("policy_id") != policy_id:
+            raise KeyError(f"policy {policy_id} is not configured")
+        return Policy(raw)
     path = _CONFIG_DIR / f"{policy_id.lower()}.json"
     with path.open(encoding="utf-8") as fh:
         return Policy(json.load(fh))

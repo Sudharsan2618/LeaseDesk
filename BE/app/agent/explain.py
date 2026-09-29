@@ -120,8 +120,11 @@ def explain_scenarios(offer: Offer) -> str:
                      f"residual {s.assessment.value.residual_value_pct}%"
                      for s in offer.scenarios if s.calculation)
     obj = offer.commercial.objective or ""
-    system = ("You compare leasing scenarios for an internal user. Use ONLY the given numbers. "
-              "You may recommend an option as ADVISORY, but you never select it. Concise. "
+    system = ("You compare leasing scenarios for an internal user. Use ONLY the given numbers and "
+              "the options shown. All scenarios preserve the requested asset, term, mileage, quantity, "
+              "payment and confirmed choices; compare only their service bundles. Do not suggest "
+              "different terms or claim a longer term is cheaper. You may recommend an option as "
+              "ADVISORY, but you never select it. Concise. "
               f"Write in {_lang_word(offer)}.")
     try:
         text = llm.chat(system, f"Objective: {obj}\nScenarios: {rows}\n\nCompare and advise.")
@@ -151,4 +154,4 @@ def _templated_scenarios(offer: Offer) -> str:
         return "No scenarios available."
     parts = [f"{s.label}: {s.calculation.value.monthly_gross_eur} EUR/mo"
              for s in offer.scenarios if s.calculation]
-    return "Scenarios (longer term = lower monthly): " + "; ".join(parts) + "."
+    return "Scenarios use the requested term and differ only by optional service bundle: " + "; ".join(parts) + "."

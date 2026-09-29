@@ -33,6 +33,26 @@ export const getAudit = (id: string) =>
   );
 export const getAuditAll = () => getJSON<AuditAllRow[]>("/audit");
 
+export interface EditableSetting {
+  kind: string;
+  revision: number;
+  updated_at: string | null;
+  updated_by: string | null;
+  data: Record<string, unknown>;
+}
+
+export const getSettings = () => getJSON<EditableSetting[]>("/settings");
+
+export async function putSetting(kind: string, revision: number, data: Record<string, unknown>) {
+  const res = await fetch(`${API_BASE}/settings/${encodeURIComponent(kind)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ revision, data }),
+  });
+  if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+  return res.json() as Promise<EditableSetting>;
+}
+
 /**
  * POST a body and consume the Server-Sent-Events stream from the backend.
  * Native EventSource is GET-only, so we read the fetch body stream ourselves.

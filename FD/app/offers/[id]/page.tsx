@@ -130,17 +130,18 @@ export default function Workspace({ params }: { params: Promise<{ id: string }> 
       </div>
 
         <div className="wbmain">
-          <WizardRail current={stage} done={generated} busy={running} values={stepValues}
-            onGoto={(intakeInt || gate) ? (s) => gotoStep(s) : undefined} />
+          {!intakeInt && <WizardRail current={stage} done={generated} busy={running} values={stepValues}
+            onGoto={gate ? (s) => gotoStep(s) : undefined} />}
 
           {!intakeInt && offer.provenance && (
             <RequestSummary provenance={offer.provenance} title="Requirement Summary" />
           )}
 
           {intakeInt && (
-            <RequirementPanel fields={fields} busy={running}
-              onConfirmField={(f) => intakeTurn({ confirm_field: f })}
+            <RequirementPanel fields={fields} pending={pendingFields} proposed={offer.proposed ?? {}} busy={running}
+              onConfirmField={(field) => intakeTurn({ confirm_field: field })}
               onProceed={() => intakeTurn({ proceed: true })}
+              onChoose={(field, overrides) => intakeTurn({ overrides, confirm_field: field })}
               onEdit={(ov) => intakeTurn({ overrides: ov })} />
           )}
 
@@ -211,8 +212,7 @@ export default function Workspace({ params }: { params: Promise<{ id: string }> 
                 )}
               </div>
                 <div className="pbody stack">
-                  <p className="mini muted">Scenarios are built around your requested term, honouring your
-                    choices. Pick one, adjust with the agent, or generate. Nothing is locked.</p>
+                  <p className="mini muted">Every option keeps your selected vehicle, term, mileage, fleet size, and payment. Compare the optional service bundles, then choose one to generate.</p>
                   <ScenarioCards scenarios={offer.scenarios} onSelect={selectScenario}
                     selectedLabel={offer.selected_scenario_label} busy={running} />
                   {selectedOverBudget && <div className="banner bad mini">This scenario exceeds the stated budget. Choose a fitting option before generating.</div>}

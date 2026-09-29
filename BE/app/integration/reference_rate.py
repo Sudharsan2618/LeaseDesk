@@ -24,6 +24,11 @@ class ReferenceRateAdapter:
         """request = {"as_of": "2026-09-23"} (ignored in MOCK). Returns reference_rate %."""
         if self.mode is not AdapterMode.MOCK:
             raise ExternalServiceUnavailable("only MOCK mode wired in Phase 1")
+        from app.db.mongo_settings import get_setting
+        configured = get_setting("engine_inputs")
+        inputs = configured["data"] if configured else {}
         return ProvenanceValue.established(
-            self._MOCK_RATE_PCT, source="BUNDESBANK", source_type=SourceType.OPEN_OFFICIAL
+            Decimal(str(inputs.get("reference_rate_pct", self._MOCK_RATE_PCT))),
+            source=inputs.get("reference_rate_source", "BUNDESBANK"),
+            source_type=SourceType.OPEN_OFFICIAL,
         )

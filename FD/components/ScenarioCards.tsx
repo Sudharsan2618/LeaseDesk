@@ -17,7 +17,7 @@ export function ScenarioCards({
           <div key={s.scenario} className={`scard ${sel ? "sel" : ""}`}
             onClick={() => !busy && onSelect?.(s.scenario)} style={{ cursor: onSelect ? "pointer" : "default" }}>
             <div className="font-semibold flex items-center gap-2">
-              {s.term_months} mo
+              {s.scenario}
               {sel && <span className="mini" style={{ color: "var(--accent-hover)" }}>selected</span>}
               {!sel && cheapest?.scenario === s.scenario && <span className="mini" style={{ color: "var(--green)" }}>lowest</span>}
             </div>

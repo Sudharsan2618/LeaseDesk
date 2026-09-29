@@ -118,6 +118,49 @@ class ReviewDecision(BaseModel):
     note: Optional[str] = None
 
 
+class SettingsUpdate(BaseModel):
+    revision: int
+    data: dict[str, Any]
+
+
+@app.on_event("startup")
+def initialize_mongo_settings() -> None:
+    """Initialize editable configuration only when MongoDB was configured for this deployment."""
+    from app.db.mongo_settings import initialize_settings
+    if os.environ.get("MONGODB_URI"):
+        initialize_settings()
+
+
+@app.get("/settings")
+def settings_index():
+    from app.db.mongo_settings import list_settings
+    try:
+        rows = list_settings()
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(503, "Settings database is unavailable") from exc
+    return [{"kind": row["_id"], "revision": row["revision"],
+             "updated_at": row.get("updated_at"), "updated_by": row.get("updated_by"),
+             "data": row["data"]} for row in rows]
+
+
+@app.put("/settings/{kind}")
+def update_setting(kind: str, req: SettingsUpdate):
+    from app.db.mongo_settings import save_setting
+    try:
+        row = save_setting(kind, req.data, expected_revision=req.revision)
+    except KeyError as exc:
+        raise HTTPException(404, "Unknown settings document") from exc
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(503, "Settings database is unavailable") from exc
+    if row is None:
+        raise HTTPException(409, "Settings changed since you loaded them; reload and apply your edits again")
+    return {"kind": row["_id"], "revision": row["revision"],
+            "updated_at": row.get("updated_at"), "updated_by": row.get("updated_by"),
+            "data": row["data"]}
+
+
 # --- helpers ------------------------------------------------------------------ #
 def _cfg(thread_id: str) -> dict:
     return {"configurable": {"thread_id": thread_id}}

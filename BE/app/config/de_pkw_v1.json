@@ -20,6 +20,13 @@
 
   "residual": {
     "base_price_basis": "LIST_PRICE_NET",
+    "confidence": {
+      "low_if_used_age_over_years": 3,
+      "low_if_annual_mileage_over_km": 35000,
+      "high_max_term_months": 48,
+      "high_max_annual_mileage_km": 25000
+    },
+    "used_vehicle_age_penalty_pp_per_year": 2,
     "base_term_rv_pct": { "12": 80, "24": 68, "36": 58, "48": 49, "60": 41 },
     "extra_5000km_penalty_pp": 2.5,
     "lower_5000km_bonus_pp": 1.5,
@@ -75,6 +82,7 @@
 
   "mileage_settlement": {
     "tolerance_km": 2000,
+    "vehicle_value_thresholds_eur": { "lower": 30000, "upper": 60000 },
     "per_km_rate_eur_by_vehicle_value": { "le_30k": 0.10, "30k_60k": 0.15, "gt_60k": 0.20 }
   },
 
